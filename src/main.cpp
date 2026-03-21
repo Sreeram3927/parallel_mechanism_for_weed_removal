@@ -1,6 +1,5 @@
 #include <Arduino.h>
-#include <motors.cpp>
-#include <single_encoder.cpp>
+#include <motors.h>
 
 bool moving = false;
 float targetAngleA = 0.0f;
@@ -9,18 +8,17 @@ void setup() {
   Serial.begin(115200);
   delay(400);
   
-  setupMotors();
-  setupSingleEncoder();
+  myMotors.setup();
 
   delay(300);
-  Serial.println("A: jog +, D: jog -, G <angle>: go to absolute angle\n");
+  Serial.println("A: jog +, D: jog -\n");
 }
 
 void loop() {
  
   // Check if motors are still running (non-blocking). If not, print current position.
   if (moving) {
-    if (!stillRunning()) {
+    if (!myMotors.run()) {
       moving = false;
       Serial.print("Reached target");
     }
@@ -41,16 +39,16 @@ void loop() {
   }
 
   if (cmd == 'A' || cmd == 'D') {
-    targetAngleA += (cmd == 'A') ? JOG_DEGREES : -JOG_DEGREES;
+    targetAngleA += (cmd == 'A') ? myMotors.jogDegrees() : -myMotors.jogDegrees();
     Serial.print("Jog ");
     Serial.print((cmd == 'A') ? "+" : "-");
-    Serial.print(JOG_DEGREES);
+    Serial.print(myMotors.jogDegrees());
     Serial.println(" deg");
   } else {
     Serial.println("Unknown command. Use: A  D");
     return;
   }
 
-  moveA(targetAngleA);
+  myMotors.moveA(targetAngleA);
   moving = true;
 }

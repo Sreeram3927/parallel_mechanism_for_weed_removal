@@ -71,7 +71,7 @@ float getShaftAngleFromPWM() {
   if (highTime == 0) {
     Serial.println("No PWM signal - check OUT connection / magnet / mode");
     delay(500);
-    return;
+    return -1.0;
   }
 
   unsigned long lowTime  = pulseIn(PWM_PIN, LOW, 30000UL);

@@ -8,6 +8,8 @@
 // ─── Objects ─────────────────────────────────────────────
 AS5600 encoder;
 
+#define TARE 169.0f  // Optional: adjust this based on your magnet's position to get 0° at your desired reference point
+
 void setupSingleEncoder() {
 
   Serial.println("AS5600 PWM Test - Temporary Mode (no burn)");
@@ -64,6 +66,12 @@ void setupSingleEncoder() {
   
 }
 
+float adjustTare(float angle) {
+  float adjusted = angle - TARE;
+  if (adjusted < 0) adjusted += 360.0f;
+  return adjusted;
+}
+
 float getShaftAngleFromPWM() {
   float angle;
 
@@ -86,7 +94,7 @@ float getShaftAngleFromPWM() {
     angle = constrain(angle, 0.0, 360.0);
   }
 
-  return angle;
+  return adjustTare(angle);
 }
 
 float getShaftAngleFromI2C() {
@@ -99,7 +107,7 @@ float getShaftAngleFromI2C() {
     uint16_t low  = Wire.read();
     uint16_t raw  = (high << 8) | low;
     raw &= 0x0FFF;            // 12-bit
-    return (float) raw * (360.0f / 4096.0f);
+    return adjustTare((float) raw * (360.0f / 4096.0f));
   }
   return -1.0;
 }

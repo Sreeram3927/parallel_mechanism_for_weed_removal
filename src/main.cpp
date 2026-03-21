@@ -18,7 +18,7 @@ void loop() {
  
   // Check if motors are still running (non-blocking). If not, print current position.
   if (moving) {
-    if (!myMotors.run()) {
+    if (!myMotors.iRun()) {
       moving = false;
       Serial.print("Reached target");
     }
@@ -44,11 +44,12 @@ void loop() {
     Serial.print((cmd == 'A') ? "+" : "-");
     Serial.print(myMotors.jogDegrees());
     Serial.println(" deg");
+
+    myMotors.moveA(targetAngleA);
+    moving = true;
   } else {
     Serial.println("Unknown command. Use: A  D");
     return;
   }
 
-  myMotors.moveA(targetAngleA);
-  moving = true;
 }

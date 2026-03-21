@@ -25,8 +25,11 @@ void MyMotors::setup() {
   stepperB.setMaxSpeed(maxSpeed());
   stepperC.setMaxSpeed(maxSpeed());
 
+  stepperA.setAcceleration(MAX_ACCELERATION);
+  stepperB.setAcceleration(MAX_ACCELERATION);
+  stepperC.setAcceleration(MAX_ACCELERATION);
+
   stepperC.setPinsInverted(true, false, false);
-  
 
   steppers.addStepper(stepperA);
   steppers.addStepper(stepperB);
@@ -71,6 +74,23 @@ void MyMotors::moveAll(float angleA, float angleB, float angleC) {
 
 bool MyMotors::run() {
   return steppers.run();
+}
+
+bool MyMotors::iRun() {
+  bool running = false;
+  if (stepperA.isRunning()) {
+    stepperA.run();
+    running = true;
+  }
+  if (stepperB.isRunning()) {
+    stepperB.run();
+    running = true;
+  }
+  if (stepperC.isRunning()) {
+    stepperC.run();
+    running = true;
+  }
+  return running;
 }
 
 void MyMotors::stopAll() {

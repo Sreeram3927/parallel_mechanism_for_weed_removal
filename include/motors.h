@@ -1,8 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <AccelStepper.h>
-#include <MultiStepper.h>
+#include <FastAccelStepper.h>
 
 class MyMotors {
 public:
@@ -13,22 +12,25 @@ public:
   void moveB(float angleB);
   void moveC(float angleC);
   void moveAll(float angleA, float angleB, float angleC);
-  bool run();
-  bool iRun(); // Use iRun() when not using MultiStepper, to run each stepper independently (non-blocking)
+  
+  // run() and iRun() are GONE! 
+  // You no longer need to call anything in your main loop.
+  // Use this function just to check if they are currently moving.
+  bool isRunning(); 
+  
   void stopAll();
-  float jogDegrees() const;
 
   void jogA(String dir) {
-    float delta = (dir == "+") ? jogDegrees() : -jogDegrees();
-    moveA(delta);
+    float delta = (dir == "+") ? JOG_DEGREES : -JOG_DEGREES;
+    if (stepperA) stepperA->move(lround(delta * stepsPerDegree())); // move() is relative
   }
   void jogB(String dir) {
-    float delta = (dir == "+") ? jogDegrees() : -jogDegrees();
-    moveB(delta);
+    float delta = (dir == "+") ? JOG_DEGREES : -JOG_DEGREES;
+    if (stepperB) stepperB->move(lround(delta * stepsPerDegree()));
   }
   void jogC(String dir) {
-    float delta = (dir == "+") ? jogDegrees() : -jogDegrees();
-    moveC(delta);
+    float delta = (dir == "+") ? JOG_DEGREES : -JOG_DEGREES;
+    if (stepperC) stepperC->move(lround(delta * stepsPerDegree()));
   }
 
 private:
@@ -47,14 +49,15 @@ private:
     return stepsPerOutputRev() / 360.0f;
   }
 
-  static constexpr float maxSpeed() {
-    return (MAX_RPM_OUTPUT * stepsPerOutputRev()) / 60.0f;
+  static constexpr uint32_t maxSpeedHz() {
+    return (uint32_t)((MAX_RPM_OUTPUT * stepsPerOutputRev()) / 60.0f);
   }
 
-  AccelStepper stepperA;
-  AccelStepper stepperB;
-  AccelStepper stepperC;
-  MultiStepper steppers;
+  // FastAccelStepper Objects
+  FastAccelStepperEngine engine;
+  FastAccelStepper *stepperA;
+  FastAccelStepper *stepperB;
+  FastAccelStepper *stepperC;
 };
 
 extern MyMotors myMotors;

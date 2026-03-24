@@ -11,94 +11,85 @@
 
 MyMotors myMotors;
 
-MyMotors::MyMotors()
-    : stepperA(AccelStepper::DRIVER, A_STEP_PIN, A_DIR_PIN),
-      stepperB(AccelStepper::DRIVER, B_STEP_PIN, B_DIR_PIN),
-      stepperC(AccelStepper::DRIVER, C_STEP_PIN, C_DIR_PIN) {}
+MyMotors::MyMotors() {
+  stepperA = NULL;
+  stepperB = NULL;
+  stepperC = NULL;
+}
 
 void MyMotors::setup() {
-  stepperA.setMinPulseWidth(20);
-  stepperB.setMinPulseWidth(20);
-  stepperC.setMinPulseWidth(20);
+  engine.init();
 
-  stepperA.setMaxSpeed(maxSpeed());
-  stepperB.setMaxSpeed(maxSpeed());
-  stepperC.setMaxSpeed(maxSpeed());
+  // Connect Stepper A
+  stepperA = engine.stepperConnectToPin(A_STEP_PIN);
+  if (stepperA) {
+    stepperA->setDirectionPin(A_DIR_PIN);
+    stepperA->setSpeedInHz(maxSpeedHz());
+    stepperA->setAcceleration(MAX_ACCELERATION);
+  }
 
-  stepperA.setAcceleration(MAX_ACCELERATION);
-  stepperB.setAcceleration(MAX_ACCELERATION);
-  stepperC.setAcceleration(MAX_ACCELERATION);
+  // Connect Stepper B
+  stepperB = engine.stepperConnectToPin(B_STEP_PIN);
+  if (stepperB) {
+    stepperB->setDirectionPin(B_DIR_PIN);
+    stepperB->setSpeedInHz(maxSpeedHz());
+    stepperB->setAcceleration(MAX_ACCELERATION);
+  }
 
-  stepperC.setPinsInverted(true, false, false);
+  // Connect Stepper C
+  stepperC = engine.stepperConnectToPin(C_STEP_PIN);
+  if (stepperC) {
+    // The 'true' at the end inverts the direction pin, replacing your old setPinsInverted
+    stepperC->setDirectionPin(C_DIR_PIN, true); 
+    stepperC->setSpeedInHz(maxSpeedHz());
+    stepperC->setAcceleration(MAX_ACCELERATION);
+  }
 
-  steppers.addStepper(stepperA);
-  steppers.addStepper(stepperB);
-  steppers.addStepper(stepperC);
-
-  Serial.println("\n=== 3-Axis Coordinated Control ===");
+  Serial.println("\n=== FastAccelStepper 3-Axis Control ===");
+  Serial.println("Hardware Timers Engaged - Zero CPU Overhead");
   Serial.print("Jog amount: +/-");
   Serial.print(JOG_DEGREES);
   Serial.println(" deg");
   Serial.print("Output Speed: ");
   Serial.print(MAX_RPM_OUTPUT);
   Serial.print(" RPM (");
-  Serial.print(maxSpeed(), 0);
+  Serial.print(maxSpeedHz());
   Serial.println(" steps/s)");
-  Serial.println("Type 'A' to move forward, 'D' to move backward");
-  Serial.println("==================================\n");
+  Serial.println("=======================================\n");
 }
 
 void MyMotors::moveA(float angleA) {
-  const long stepsA = lround(angleA * stepsPerDegree());
-  stepperA.moveTo(stepsA);
+  if (stepperA) stepperA->moveTo(lround(angleA * stepsPerDegree()));
 }
 
 void MyMotors::moveB(float angleB) {
-  const long stepsB = lround(angleB * stepsPerDegree());
-  stepperB.moveTo(stepsB);
+  if (stepperB) stepperB->moveTo(lround(angleB * stepsPerDegree()));
 }
 
 void MyMotors::moveC(float angleC) {
-  const long stepsC = lround(angleC * stepsPerDegree());
-  stepperC.moveTo(stepsC);
+  if (stepperC) stepperC->moveTo(lround(angleC * stepsPerDegree()));
 }
 
 void MyMotors::moveAll(float angleA, float angleB, float angleC) {
-  const long stepsA = lround(angleA * stepsPerDegree());
-  const long stepsB = lround(angleB * stepsPerDegree());
-  const long stepsC = lround(angleC * stepsPerDegree());
-
-  long targets[3] = {stepsA, stepsB, stepsC};
-  steppers.moveTo(targets);
+  // Because these commands are sent directly to the hardware peripherals,
+  // calling them sequentially will start the motors virtually simultaneously.
+  moveA(angleA);
+  moveB(angleB);
+  moveC(angleC);
 }
 
-bool MyMotors::run() {
-  return steppers.run();
-}
-
-bool MyMotors::iRun() {
+bool MyMotors::isRunning() {
   bool running = false;
-  if (stepperA.isRunning()) {
-    stepperA.run();
-    running = true;
-  }
-  if (stepperB.isRunning()) {
-    stepperB.run();
-    running = true;
-  }
-  if (stepperC.isRunning()) {
-    stepperC.run();
-    running = true;
-  }
+  if (stepperA && stepperA->isRunning()) running = true;
+  if (stepperB && stepperB->isRunning()) running = true;
+  if (stepperC && stepperC->isRunning()) running = true;
   return running;
 }
 
 void MyMotors::stopAll() {
-  stepperA.stop();
-  stepperB.stop();
-  stepperC.stop();
-}
-
-float MyMotors::jogDegrees() const {
-  return JOG_DEGREES;
+  // stopMove() decelerates the motor gracefully. 
+  // If you want an emergency stop, use forceStop() instead.
+  if (stepperA) stepperA->stopMove();
+  if (stepperB) stepperB->stopMove();
+  if (stepperC) stepperC->stopMove();
 }

@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <motors.h>
 
 void setupSingleEncoder();
 float getShaftAngleFromPWM();

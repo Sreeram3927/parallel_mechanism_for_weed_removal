@@ -2,8 +2,8 @@
 #include <Wire.h>
 
 // ─── Pin Definitions ─────────────────────────────────────
-#define PWM_PIN     9
-#define GPO_PIN     8
+#define PWM_PIN     19
+#define GPO_PIN     18
 
 // ─── Objects ─────────────────────────────────────────────
 AS5600 encoder;

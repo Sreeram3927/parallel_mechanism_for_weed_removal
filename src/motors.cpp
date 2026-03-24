@@ -1,13 +1,13 @@
 #include <motors.h>
 
-#define A_STEP_PIN 2
-#define A_DIR_PIN 5
+#define A_STEP_PIN 13
+#define A_DIR_PIN  14
 
-#define B_STEP_PIN 3
-#define B_DIR_PIN 6
+#define B_STEP_PIN 25
+#define B_DIR_PIN  26
 
-#define C_STEP_PIN 4
-#define C_DIR_PIN 7
+#define C_STEP_PIN 27
+#define C_DIR_PIN  32
 
 MyMotors myMotors;
 

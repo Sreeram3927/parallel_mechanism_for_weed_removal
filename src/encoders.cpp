@@ -1,10 +1,11 @@
 #include <encoders.h>
 
-#define PWM_A       9
-#define PWM_B       10
-#define PWM_C       11
+// Safe output pins for ESP32 (Avoiding Flash, Strapping, and default I2C pins)
+#define PWM_A       16 
+#define PWM_B       17 
+#define PWM_C       18 
 
-#define GPO_PIN     8
+#define GPO_PIN     19
 
 MyEncoders myEncoders;
 

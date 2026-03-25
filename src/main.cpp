@@ -1,26 +1,32 @@
 #include <Arduino.h>
-#include <motors.h>
+#include <motor_unit.h>
+#include <FastAccelStepper.h>
 
 bool moving = false;
-float targetAngleA = 0.0f;
 
-void setupSingleEncoder();
-float getShaftAngleFromPWM_Filtered();
-float getShaftAngleFromPWM();
+FastAccelStepperEngine engine;
+MotorUnit armA('A', 13, 14, 19, false, 168.0f);
+
+
+const int JOG_DEGREES = 15.0f;
+
+const int GPO_PIN = 18;
 
 void setup() {
   Serial.begin(115200);
   delay(500);
 
-  myMotors.setup();
+  engine.init();
 
-  setupSingleEncoder();
+  pinMode(GPO_PIN, OUTPUT);
+  digitalWrite(GPO_PIN, HIGH);
 
+  armA.init(engine);
 
   Serial.println("Controls:");
   Serial.println("  Q / A : Jog Axis A (+/-)");
-  Serial.println("  W / S : Jog Axis B (+/-)");
-  Serial.println("  E / D : Jog Axis C (+/-)");
+  // Serial.println("  W / S : Jog Axis B (+/-)");
+  // Serial.println("  E / D : Jog Axis C (+/-)");
   Serial.println("  X     : Stop All Motors");
   Serial.println("---------------------------------------");
 }
@@ -31,21 +37,20 @@ void loop() {
     char cmd = toupper(Serial.read());
 
     switch (cmd) {
-      case 'Q': myMotors.jogA("+"); Serial.println("Jogging A+"); break;
-      case 'A': myMotors.jogA("-"); Serial.println("Jogging A-"); break;
+      case 'Q': armA.moveRelative(JOG_DEGREES); Serial.println("Jogging A+"); break;
+      case 'A': armA.moveRelative(-JOG_DEGREES); Serial.println("Jogging A-"); break;
       
-      case 'W': myMotors.jogB("+"); Serial.println("Jogging B+"); break;
-      case 'S': myMotors.jogB("-"); Serial.println("Jogging B-"); break;
+      // case 'W': myMotors.jogB("+"); Serial.println("Jogging B+"); break;
+      // case 'S': myMotors.jogB("-"); Serial.println("Jogging B-"); break;
       
-      case 'E': myMotors.jogC("+"); Serial.println("Jogging C+"); break;
-      case 'D': myMotors.jogC("-"); Serial.println("Jogging C-"); break;
+      // case 'E': myMotors.jogC("+"); Serial.println("Jogging C+"); break;
+      // case 'D': myMotors.jogC("-"); Serial.println("Jogging C-"); break;
 
-      case 'X': myMotors.stopAll(); Serial.println("EMERGENCY STOP"); break;
+      case 'X': armA.stop(); Serial.println("EMERGENCY STOP"); break;
     }
   }
 
-  float rawAngle = getShaftAngleFromPWM_Filtered();
-  Serial.print("Filtered Angle: ");
-  Serial.println(rawAngle, 2);
   
+  armA.printAngle();
+
 }

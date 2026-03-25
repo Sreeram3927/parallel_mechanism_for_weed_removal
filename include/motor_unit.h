@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <FastAccelStepper.h>
 #include <AS5600.h>
+#include <angle_filter.h>
 
 class MotorUnit {
   public:
@@ -75,7 +76,7 @@ class MotorUnit {
 
       angle = fmod(angle - OFFSET + 360.0f, 360.0f); // Apply offset and normalize
 
-      return angle;
+      return _filter.update(angle);
     };
 
     void printAngle() {
@@ -122,6 +123,7 @@ class MotorUnit {
     
     FastAccelStepper* _stepper = nullptr;
     AS5600 _encoder;
+    AngleFilter _filter;
 
     float degreesToSteps(float deg);
 };

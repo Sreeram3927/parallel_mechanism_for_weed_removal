@@ -4,11 +4,18 @@
 bool moving = false;
 float targetAngleA = 0.0f;
 
+void setupSingleEncoder();
+float getShaftAngleFromPWM_Filtered();
+float getShaftAngleFromPWM();
+
 void setup() {
   Serial.begin(115200);
   delay(500);
 
   myMotors.setup();
+
+  setupSingleEncoder();
+
 
   Serial.println("Controls:");
   Serial.println("  Q / A : Jog Axis A (+/-)");
@@ -36,4 +43,9 @@ void loop() {
       case 'X': myMotors.stopAll(); Serial.println("EMERGENCY STOP"); break;
     }
   }
+
+  float rawAngle = getShaftAngleFromPWM_Filtered();
+  Serial.print("Filtered Angle: ");
+  Serial.println(rawAngle, 2);
+  
 }

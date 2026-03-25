@@ -1,6 +1,82 @@
 #include <AS5600.h>
 #include <Wire.h>
 
+float getShaftAngleFromPWM();
+// ─── Moving Average Filter ──────────────────────────────
+
+class AngleFilter {
+  private:
+    static const int BUFFER_SIZE = 15;  // Total history to keep
+    static const int TRIM_COUNT = 3;    // Number of highest AND lowest outliers to drop (e.g., drop top 3 and bottom 3)
+    
+    float buffer[BUFFER_SIZE];
+    int index = 0;
+    bool filled = false;
+  
+  public:
+    AngleFilter() {
+      for (int i = 0; i < BUFFER_SIZE; i++) {
+        buffer[i] = 0.0f;
+      }
+    }
+  
+    float update(float rawAngle) {
+      // 1. Store the new value in the chronological circular buffer
+      buffer[index] = rawAngle;
+      index = (index + 1) % BUFFER_SIZE;
+      if (index == 0) filled = true;
+  
+      // Determine how many valid readings we actually have (important for startup)
+      int count = filled ? BUFFER_SIZE : (index == 0 ? 1 : index);
+  
+      // 2. Copy data to a temporary array so we can sort it without ruining the timeline
+      float temp[BUFFER_SIZE];
+      for (int i = 0; i < count; i++) {
+        temp[i] = buffer[i];
+      }
+  
+      // 3. Sort the temporary array (Insertion sort is extremely fast for small arrays like 15)
+      for (int i = 1; i < count; i++) {
+        float key = temp[i];
+        int j = i - 1;
+        while (j >= 0 && temp[j] > key) {
+          temp[j + 1] = temp[j];
+          j = j - 1;
+        }
+        temp[j + 1] = key;
+      }
+  
+      // 4. If buffer isn't full enough to trim yet, just do a normal average
+      if (count <= TRIM_COUNT * 2) {
+        float sum = 0.0f;
+        for (int i = 0; i < count; i++) sum += temp[i];
+        return sum / count;
+      }
+  
+      // 5. Trimmed Mean: Ignore the lowest extremes and highest extremes
+      float sum = 0.0f;
+      int validCount = 0;
+      
+      for (int i = TRIM_COUNT; i < count - TRIM_COUNT; i++) {
+        sum += temp[i];
+        validCount++;
+      }
+      
+      return sum / validCount;
+    }
+  };
+// Create filter instance
+AngleFilter angleFilter;
+
+// Filtered version of your existing function
+float getShaftAngleFromPWM_Filtered() {
+  float rawAngle = getShaftAngleFromPWM();
+  if (rawAngle >= 0) {
+    return angleFilter.update(rawAngle);
+  }
+  return -1.0;  // Return error state without filtering
+}
+
 // ─── Pin Definitions ─────────────────────────────────────
 #define PWM_PIN     19
 #define GPO_PIN     18
@@ -8,36 +84,36 @@
 // ─── Objects ─────────────────────────────────────────────
 AS5600 encoder;
 
-#define TARE 169.0f  // Optional: adjust this based on your magnet's position to get 0° at your desired reference point
+#define TARE 168.0f  // Optional: adjust this based on your magnet's position to get 0° at your desired reference point
 
 void setupSingleEncoder() {
 
   Serial.println("AS5600 PWM Test - Temporary Mode (no burn)");
 
-  Wire.begin();
-  encoder.begin(4);           // 4 = fast mode, but default is fine too
+  // Wire.begin(21, 22);
+  // encoder.begin();           // 4 = fast mode, but default is fine too
 
-  if (!encoder.isConnected()) {
-    Serial.println("ERROR: AS5600 not detected on I2C (0x36)!");
-    while (1);
-  }
+  // if (!encoder.isConnected()) {
+  //   Serial.println("ERROR: AS5600 not detected on I2C (0x36)!");
+  //   while (1);
+  // }
 
-  Serial.print("Chip status: ");
-  Serial.println(encoder.readStatus(), BIN);   // check magnet (bit 3-5)
+  // Serial.print("Chip status: ");
+  // Serial.println(encoder.readStatus(), BIN);   // check magnet (bit 3-5)
 
-  // Optional: choose low frequency for easier/more accurate pulseIn reading
-  encoder.setPWMFrequency(AS5600_PWM_115);    // 115 Hz (slowest, best for testing)
-  // Other options: AS5600_PWM_115, AS5600_PWM_230, _460, _920 (faster but pulseIn less precise)
+  // // Optional: choose low frequency for easier/more accurate pulseIn reading
+  // encoder.setPWMFrequency(AS5600_PWM_115);    // 115 Hz (slowest, best for testing)
+  // // Other options: AS5600_PWM_115, AS5600_PWM_230, _460, _920 (faster but pulseIn less precise)
 
-  // Switch to PWM mode (OUT pin now outputs PWM instead of analog)
-  bool success = encoder.setOutputMode(AS5600_OUTMODE_PWM);
-  if (success) {
-    Serial.println("PWM mode activated successfully!");
-  } else {
-    Serial.println("Failed to set PWM mode - check wiring/magnet");
-  }
+  // // Switch to PWM mode (OUT pin now outputs PWM instead of analog)
+  // bool success = encoder.setOutputMode(AS5600_OUTMODE_PWM);
+  // if (success) {
+  //   Serial.println("PWM mode activated successfully!");
+  // } else {
+  //   Serial.println("Failed to set PWM mode - check wiring/magnet");
+  // }
 
-  delay(200);  // small settle time
+  // delay(200);  // small settle time
 
   Serial.println("Duty cycle ~3% at 0°, ~97% at 360°");
   pinMode(PWM_PIN, INPUT);

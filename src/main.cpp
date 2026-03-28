@@ -5,10 +5,13 @@
 bool moving = false;
 
 FastAccelStepperEngine engine;
+// MotorUnit(id, stepPin, dirPin, pwmPin, invertDir, offset)
 MotorUnit armA('A', 13, 14, 19, false, 168.0f);
+MotorUnit armB('B', 25, 26, 20, false, 168.0f);
+MotorUnit armC('C', 27, 32, 21, false, 168.0f);
 
 
-const int JOG_DEGREES = 15.0f;
+const int JOG_DEGREES = 20.0f;
 
 const int GPO_PIN = 18;
 
@@ -22,6 +25,8 @@ void setup() {
   digitalWrite(GPO_PIN, HIGH);
 
   armA.init(engine);
+  armB.init(engine);
+  armC.init(engine);
 
   Serial.println("Controls:");
   Serial.println("  Q / A : Jog Axis A (+/-)");
@@ -37,8 +42,18 @@ void loop() {
     char cmd = toupper(Serial.read());
 
     switch (cmd) {
-      case 'Q': armA.moveRelative(JOG_DEGREES); Serial.println("Jogging A+"); break;
-      case 'A': armA.moveRelative(-JOG_DEGREES); Serial.println("Jogging A-"); break;
+      case 'Q': 
+        armA.moveRelative(JOG_DEGREES); Serial.println("Jogging A+"); 
+        armB.moveRelative(JOG_DEGREES); Serial.println("Jogging B+"); 
+        armC.moveRelative(JOG_DEGREES); Serial.println("Jogging C+"); 
+        break;
+      
+      case 'A': 
+        armA.moveRelative(-JOG_DEGREES); Serial.println("Jogging A-"); 
+        armB.moveRelative(-JOG_DEGREES); Serial.println("Jogging B-"); 
+        armC.moveRelative(-JOG_DEGREES); Serial.println("Jogging C-"); 
+
+        break;
       
       // case 'W': myMotors.jogB("+"); Serial.println("Jogging B+"); break;
       // case 'S': myMotors.jogB("-"); Serial.println("Jogging B-"); break;

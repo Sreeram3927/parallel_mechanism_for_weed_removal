@@ -2,37 +2,49 @@
 
 #include <Arduino.h>
 #include <FastAccelStepper.h>
+#include <Wire.h>
 #include <AS5600.h>
 #include <angle_filter.h>
 
+// Global helper to switch the I2C multiplexer channel
+// (Keep this outside the class so it's easily accessible)
+inline void tcaselect(uint8_t channel) {
+  if (channel > 7) return;
+  Wire.beginTransmission(0x70); // TCA9548A address
+  Wire.write(1 << channel);
+  Wire.endTransmission();
+}
+
 class MotorUnit {
   public:
-    // Pass the specific hardware config for this arm
-    MotorUnit(char id, int stepPin, int dirPin, int pwmPin, bool invertDir, float offset)
-      : _id(id), _stepPin(stepPin), _dirPin(dirPin), _pwmPin(pwmPin), _invertDir(invertDir), OFFSET(offset) {};
+    MotorUnit(char id, int stepPin, int dirPin, short tcaChannel, bool invertDir, float offset)
+      : _id(id), _stepPin(stepPin), _dirPin(dirPin), _tcaChannel(tcaChannel), _invertDir(invertDir), OFFSET(offset) {};
 
     void init(FastAccelStepperEngine& engine) {
       _stepper = engine.stepperConnectToPin(_stepPin);
       if (_stepper) {
-        
         _stepper->setDirectionPin(_dirPin, _invertDir);
         _stepper->setSpeedInHz(maxSpeedHz());
         _stepper->setAcceleration(MAX_ACCELERATION);
-
-        Serial.println("Initialize Motor " + _id + " on step pin " + String(_stepPin));
+        Serial.println("Initialized Motor " + String(_id) + " on step pin " + String(_stepPin));
       } else {
-        Serial.println("Failed to initialize Motor " + _id + " on step pin " + String(_stepPin));
+        Serial.println("Failed to initialize Motor " + String(_id) + " on step pin " + String(_stepPin));
       }
 
-      pinMode(_pwmPin, INPUT);
-      Serial.println("Initialized encoder " + _id + " on PWM pin " + String(_pwmPin) + "\n");
+      // Initialize the specific encoder by switching the MUX first
+      tcaselect(_tcaChannel);
+      
+      // If your AS5600 library requires an init/begin call, do it here:
+      // _encoder.begin(); 
+      
+      Serial.println("Initialized encoder " + String(_id) + " on TCA channel " + String(_tcaChannel) + "\n");
     };
     
     // Commands in Degrees
     void moveAbsolute(float angle) {
       if (_stepper) {
         float targetAngle = fmod(angle + 360.0f, 360.0f); // Normalize to [0, 360)
-        float currentAngle = getCurrentAngle();
+        float currentAngle = updateAngle();
         float deltaAngle = targetAngle - currentAngle;
 
         // Choose the shortest direction
@@ -42,7 +54,7 @@ class MotorUnit {
           deltaAngle += 360.0f;
         }
 
-        _stepper->move(lround(deltaAngle * stepsPerDegree())); // move() is relative
+        _stepper->move(lround(deltaAngle * stepsPerDegree())); 
       }
     };
 
@@ -52,53 +64,45 @@ class MotorUnit {
       }
     };
 
-    float getCurrentAngle() {
-      float angle;
+    float updateAngle() {
+      // 1. Switch the multiplexer to this motor's channel
+      tcaselect(_tcaChannel);
 
-      unsigned long highTime = pulseIn(_pwmPin, HIGH, 30000UL);   // timeout 30 ms
-      if (highTime == 0) {
-        Serial.println("No PWM signal - check OUT connection / magnet / mode");
-        delay(500);
-        return -1.0;
-      }
+      // 2. Read the raw angle from the AS5600 library
+      // (Assuming your AS5600.h library uses getRawAngle() or similar)
+      // Note: If your library uses a different method name, update it here.
+      uint16_t rawAngle = _encoder.rawAngle(); 
+      
+      // 3. Convert 12-bit raw value (0-4095) to degrees (0-360)
+      float angle = (rawAngle / 4096.0f) * 360.0f;
 
-      unsigned long lowTime  = pulseIn(_pwmPin, LOW, 30000UL);
-      unsigned long period   = highTime + lowTime;
-
-      if (period < 5000 || period > 15000) {   // rough check for ~115 Hz (~8700 us)
-        Serial.println("Strange period - possible noise or wrong freq");
-      } else {
-        float duty = (float)highTime / period * 100.0;              // %
-        angle = (duty - 2.9) / (97.1 - 2.9) * 360.0;          // standard mapping
-
-        angle = constrain(angle, 0.0, 360.0);
-      }
-
-      angle = fmod(angle - OFFSET + 360.0f, 360.0f); // Apply offset and normalize
+      // 4. Apply offset and normalize
+      angle = fmod(angle - OFFSET + 360.0f, 360.0f); 
 
       return _filter.update(angle);
+      // return angle;
     };
 
     void printAngle() {
-      float angle = getCurrentAngle();
-      if (angle >= 0) {
-        Serial.print("Motor ");
-        Serial.print(_id);
-        Serial.print(" Angle: ");
-        Serial.println(angle, 2);
-      }
+      float angle = updateAngle();
+      Serial.print("Motor ");
+      Serial.print(_id);
+      Serial.print(" (Ch ");
+      Serial.print(_tcaChannel);
+      Serial.print(") Angle: ");
+      Serial.println(angle, 2);
     };
 
     bool isMoving() {
       return _stepper ? _stepper->isRunning() : false;
     };
 
-    // Emergency stop
     void stop () {if (_stepper) _stepper->stopMove();};
 
   private:
-    String _id;
-    int _stepPin, _dirPin, _pwmPin;
+    char _id;
+    int _stepPin, _dirPin;
+    short _tcaChannel; // Stores the multiplexer channel for this specific motor
     bool _invertDir;
 
     static const int MOTOR_STEPS_PER_REV = 200;
@@ -124,6 +128,4 @@ class MotorUnit {
     FastAccelStepper* _stepper = nullptr;
     AS5600 _encoder;
     AngleFilter _filter;
-
-    float degreesToSteps(float deg);
 };

@@ -21,7 +21,7 @@ class AngleFilter {
       for (int i = 0; i < FILTER_SIZE; i++) buffer[i] = initialAngle;
     };
 
-    float update(float newAngle) {
+    void update(float newAngle) {
       // 1. Unwrap the angle to prevent 359/1 degree averaging errors
       float diff = newAngle - lastRawAngle;
       
@@ -36,7 +36,6 @@ class AngleFilter {
       buffer[index] = continuousAngle;
       index = (index + 1) % FILTER_SIZE;
     
-      return getAverage();
     };
 
     float getAverage() const {

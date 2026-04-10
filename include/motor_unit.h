@@ -26,25 +26,22 @@ class MotorUnit {
         _stepper->setDirectionPin(_dirPin, _invertDir);
         _stepper->setSpeedInHz(maxSpeedHz());
         _stepper->setAcceleration(MAX_ACCELERATION);
-        Serial.println("Initialized Motor " + String(_id) + " on step pin " + String(_stepPin));
+        ESP_LOGD("MotorUnit", "Initialized Motor %c on step pin %d", _id, _stepPin);
       } else {
-        Serial.println("Failed to initialize Motor " + String(_id) + " on step pin " + String(_stepPin));
+        ESP_LOGE("MotorUnit", "Failed to initialize Motor %c on step pin %d", _id, _stepPin);
       }
 
       // Initialize the specific encoder by switching the MUX first
       tcaselect(_tcaChannel);
       
-      // If your AS5600 library requires an init/begin call, do it here:
-      // _encoder.begin(); 
-      
-      Serial.println("Initialized encoder " + String(_id) + " on TCA channel " + String(_tcaChannel) + "\n");
+      ESP_LOGD("MotorUnit", "Initialized encoder %c on TCA channel %d", _id, _tcaChannel);
     };
     
     // Commands in Degrees
     void moveAbsolute(float angle) {
       if (_stepper) {
         float targetAngle = fmod(angle + 360.0f, 360.0f); // Normalize to [0, 360)
-        float currentAngle = updateAngle();
+        float currentAngle = getAngle();
         float deltaAngle = targetAngle - currentAngle;
 
         // Choose the shortest direction
@@ -55,23 +52,33 @@ class MotorUnit {
         }
 
         _stepper->move(lround(deltaAngle * stepsPerDegree())); 
+        ESP_LOGD("MotorUnit", "Motor %c moveAbsolute: Target=%.2f, Current=%.2f, Delta=%.2f", _id, targetAngle, currentAngle, deltaAngle);
+        return;
       }
+      ESP_LOGW("MotorUnit", "moveAbsolute failed for motor %c: Stepper not initialized", _id);
     };
 
     void moveRelative(float deltaAngle) {
       if (_stepper) {
         _stepper->move(lround(deltaAngle * stepsPerDegree()));
+        ESP_LOGD("MotorUnit", "Motor %c moveRelative: Delta=%.2f", _id, deltaAngle);
+        return;
       }
+      ESP_LOGW("MotorUnit", "moveRelative failed for motor %c: Stepper not initialized", _id);
     };
 
-    float updateAngle() {
+    void updateAngle() {
       // 1. Switch the multiplexer to this motor's channel
       tcaselect(_tcaChannel);
 
       // 2. Read the raw angle from the AS5600 library
-      // (Assuming your AS5600.h library uses getRawAngle() or similar)
-      // Note: If your library uses a different method name, update it here.
-      uint16_t rawAngle = _encoder.rawAngle(); 
+      uint16_t rawAngle;
+      try {
+        rawAngle = _encoder.rawAngle(); 
+      } catch (const std::exception& e) {
+        ESP_LOGE("MotorUnit", "Error reading encoder for motor %c in channel %d: %s", _id, _tcaChannel, e.what());
+        // return;
+      }
       
       // 3. Convert 12-bit raw value (0-4095) to degrees (0-360)
       float angle = (rawAngle / 4096.0f) * 360.0f;
@@ -79,12 +86,15 @@ class MotorUnit {
       // 4. Apply offset and normalize
       angle = fmod(angle - OFFSET + 360.0f, 360.0f); 
 
-      return _filter.update(angle);
-      // return angle;
+      _filter.update(angle);
     };
 
+    float getAngle() {
+      return _filter.getAverage();
+    }
+
     void printAngle() {
-      float angle = updateAngle();
+      float angle = getAngle();
       Serial.print("Motor ");
       Serial.print(_id);
       Serial.print(" (Ch ");
@@ -97,7 +107,14 @@ class MotorUnit {
       return _stepper ? _stepper->isRunning() : false;
     };
 
-    void stop () {if (_stepper) _stepper->stopMove();};
+    void stop () {
+      if (_stepper) {
+        _stepper->stopMove();
+        ESP_LOGD("MotorUnit", "Stop command issued for motor %c", _id);
+        return;
+      }
+      ESP_LOGW("MotorUnit", "Stop command failed for motor %c: Stepper not initialized", _id);
+    };
 
   private:
     char _id;

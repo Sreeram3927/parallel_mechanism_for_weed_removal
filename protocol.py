@@ -5,8 +5,11 @@ from config import COMMAND_TYPES
 # Regex to remove terminal color codes
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
-# Regex to parse ESP-IDF format: e.g., "I (500) General: Communication Initialized"
-ESP_LOG_PATTERN = re.compile(r'^([IEWDV]) \((\d+)\) ([^:]+):\s*(.*)$')
+# Matches Arduino ESP32 Core format: [ 546][I][main.cpp:26] setup(): Message
+ARDUINO_LOG_PATTERN = re.compile(r'^\[\s*(\d+)\]\[([IEWDV])\]\[[^\]]+\]\s*[^:]+:\s*(.*)$')
+
+# Matches custom tags embedded in the message: e.g., "[General] Communication initialized"
+TAG_PATTERN = re.compile(r'^\[([^\]]+)\]\s*(.*)$')
 
 # Map ESP log characters to full text levels
 LOG_LEVEL_MAP = {
@@ -38,20 +41,30 @@ def parse_esp_log(raw_line):
     if not clean_line:
         return None
     
-    # Check if the line matches the standard ESP-IDF log format
-    match = ESP_LOG_PATTERN.match(clean_line)
+    # 1. Try to match the Arduino Core ESP32 format
+    match = ARDUINO_LOG_PATTERN.match(clean_line)
     
     if match:
-        level_char, timestamp, tag, message = match.groups()
+        timestamp_str, level_char, raw_message = match.groups()
+        
+        # 2. Check if the message has a custom tag like "[General] message"
+        tag_match = TAG_PATTERN.match(raw_message)
+        if tag_match:
+            tag = tag_match.group(1).strip()
+            message = tag_match.group(2).strip()
+        else:
+            tag = "System" # Default to System if no custom tag is present
+            message = raw_message.strip()
+            
         return {
             "type": "log",
             "level": LOG_LEVEL_MAP.get(level_char, "info"),
-            "timestamp": int(timestamp),
+            "timestamp": int(timestamp_str),
             "tag": tag,
             "message": message
         }
     else:
-        # Fallback for standard print() statements that don't use ESP_LOG
+        # 3. Fallback for raw bootloader prints (e.g., 'ets Jun  8 2016')
         return {
             "type": "log",
             "level": "info",

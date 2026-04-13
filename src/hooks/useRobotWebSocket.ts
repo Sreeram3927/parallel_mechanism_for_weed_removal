@@ -32,7 +32,8 @@ export function useRobotWebSocket({
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempt = useRef(0);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // In the browser, window.setTimeout returns a number. (Node types can conflict in TS.)
+  const reconnectTimer = useRef<number | null>(null);
   const stopped = useRef(false);
 
   const onTelemetryRef = useRef(onTelemetry);
@@ -101,11 +102,31 @@ export function useRobotWebSocket({
       socket.onmessage = (ev) => {
         if (stopped.current) return;
         setLastMessageAt(Date.now());
-        const { telemetry, logs } = parseBridgeMessages(
-          typeof ev.data === "string" ? ev.data : "",
-        );
-        for (const t of telemetry) onTelemetryRef.current(t);
-        for (const log of logs) onLogRef.current(log);
+
+        const handle = async () => {
+          let raw = "";
+          const d = ev.data;
+          if (typeof d === "string") raw = d;
+          else if (d instanceof Blob) raw = await d.text();
+          else if (d instanceof ArrayBuffer)
+            raw = new TextDecoder().decode(new Uint8Array(d));
+          // Some servers send Uint8Array views
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          else if ((d as any)?.buffer instanceof ArrayBuffer) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const view = d as any;
+            raw = new TextDecoder().decode(
+              new Uint8Array(view.buffer, view.byteOffset ?? 0, view.byteLength),
+            );
+          }
+
+          const { telemetry, logs } = parseBridgeMessages(raw);
+          for (const t of telemetry) onTelemetryRef.current(t);
+          for (const log of logs) onLogRef.current(log);
+        };
+
+        // fire-and-forget; safe for sync and async frame types
+        void handle();
       };
 
       socket.onerror = () => {

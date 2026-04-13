@@ -15,18 +15,19 @@ export const USE_MOCK_WS = envBool("NEXT_PUBLIC_USE_MOCK_WS");
 export const ROBOT_WS_URL =
   process.env.NEXT_PUBLIC_ROBOT_WS_URL ?? "ws://10.42.0.69:8765";
 
-/** Shown in UI; browsers cannot play RTSP — use HLS (or WebRTC) from your MTX server. */
+/** Shown in UI; browsers cannot play RTSP directly — use WebRTC (WHEP) below. */
 export const REALSENSE_RTSP_URL =
   process.env.NEXT_PUBLIC_REALSENSE_RTSP ??
   "rtsp://10.42.0.69:8554/realsense";
 
-const hlsRaw = process.env.NEXT_PUBLIC_REALSENSE_HLS?.trim();
+const whepRaw = process.env.NEXT_PUBLIC_REALSENSE_WHEP?.trim();
 
 /**
- * HLS playlist URL for <video> (e.g. MediaMTX: http://HOST:8888/realsense/index.m3u8).
- * Set NEXT_PUBLIC_REALSENSE_HLS=off to skip playback and show the placeholder only.
+ * MediaMTX WHEP read URL (WebRTC in the browser).
+ * Default: HTTP WebRTC port 8889 + path segment + /whep
+ * Set NEXT_PUBLIC_REALSENSE_WHEP=off to disable video and show the placeholder only.
  */
-export const REALSENSE_HLS_URL: string | null =
-  hlsRaw && (hlsRaw === "off" || hlsRaw === "disabled")
+export const REALSENSE_WHEP_URL: string | null =
+  whepRaw && (whepRaw === "off" || whepRaw === "disabled")
     ? null
-    : (hlsRaw || "http://10.42.0.69:8888/realsense/index.m3u8");
+    : (whepRaw || "http://10.42.0.69:8889/realsense/whep");

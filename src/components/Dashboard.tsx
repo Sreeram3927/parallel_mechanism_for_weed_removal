@@ -5,8 +5,8 @@ import { CameraFeedPanel } from "@/components/CameraFeedPanel";
 import { LogViewer } from "@/components/LogViewer";
 import { RobotControlPanel } from "@/components/RobotControlPanel";
 import {
-  REALSENSE_HLS_URL,
   REALSENSE_RTSP_URL,
+  REALSENSE_WHEP_URL,
   ROBOT_WS_URL,
   USE_MOCK_WS,
 } from "@/config/bridge";
@@ -82,7 +82,7 @@ function appendLog(
       message: entry.message,
     };
     const merged = [...prev, next];
-    return merged.length > 200 ? merged.slice(-200) : merged;
+    return merged.length > 1000 ? merged.slice(-1000) : merged;
   });
 }
 
@@ -139,7 +139,7 @@ export function Dashboard() {
     const push = window.setInterval(() => {
       setLogs((prev) => {
         const next = [...prev, nextLog()];
-        return next.length > 200 ? next.slice(-200) : next;
+        return next.length > 1000 ? next.slice(-1000) : next;
       });
     }, 2800 + Math.random() * 1200);
     return () => window.clearInterval(push);
@@ -228,7 +228,7 @@ export function Dashboard() {
 
       <main className="dashboard-grid">
         <section className="dashboard-area-camera">
-          <CameraFeedPanel hlsUrl={REALSENSE_HLS_URL} rtspUrl={REALSENSE_RTSP_URL} />
+          <CameraFeedPanel whepUrl={REALSENSE_WHEP_URL} rtspUrl={REALSENSE_RTSP_URL} />
         </section>
 
         <section className="dashboard-area-robot">

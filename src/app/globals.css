@@ -38,20 +38,32 @@ body {
   gap: 1rem;
   min-height: calc(100vh - 8rem);
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(240px, 1fr) auto minmax(200px, 1fr);
+  grid-template-rows: minmax(240px, 1fr) auto auto minmax(200px, 1fr);
   grid-template-areas:
     "camera"
     "robot"
+    "mobileRobot"
     "logs";
 }
 
 @media (min-width: 768px) {
   .dashboard-grid {
-    grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr);
-    grid-template-rows: minmax(320px, 1fr) minmax(200px, 0.9fr);
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    grid-template-rows: minmax(320px, 1fr) auto minmax(200px, 0.9fr);
     grid-template-areas:
       "camera robot"
+      "camera mobileRobot"
       "logs logs";
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr) minmax(240px, 0.9fr);
+    grid-template-rows: minmax(320px, 1fr) minmax(200px, 0.9fr);
+    grid-template-areas:
+      "camera robot mobileRobot"
+      "logs logs logs";
   }
 }
 
@@ -71,6 +83,12 @@ body {
 .dashboard-area-logs {
   grid-area: logs;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-area-mobile-robot {
+  grid-area: mobileRobot;
   display: flex;
   flex-direction: column;
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CameraFeedPanel } from "@/components/CameraFeedPanel";
 import { LogViewer } from "@/components/LogViewer";
+import { MobileRobotControlPanel } from "@/components/MobileRobotControlPanel";
 import { RobotControlPanel } from "@/components/RobotControlPanel";
 import {
   REALSENSE_RTSP_URL,
@@ -299,6 +300,10 @@ export function Dashboard() {
             onSendCommand={onSendCommand}
             onEstop={onEstop}
           />
+        </section>
+
+        <section className="dashboard-area-mobile-robot">
+          <MobileRobotControlPanel />
         </section>
 
         <section className="dashboard-area-logs">

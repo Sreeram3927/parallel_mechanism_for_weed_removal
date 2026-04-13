@@ -72,7 +72,7 @@ export function RobotControlPanel({
         </div>
       </div>
 
-      <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid flex-1 grid-cols-1 gap-4 xl:grid-cols-2">
         <section>
           <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
             Telemetry (°)

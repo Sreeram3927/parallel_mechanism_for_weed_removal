@@ -1,10 +1,10 @@
 "use client";
 
 import { AlertOctagon, Send, Wifi, WifiOff } from "lucide-react";
-import type { MockWsStatus } from "@/hooks/useMockWebSocket";
+import type { BridgeStatus } from "@/types/bridge";
 
 type Props = {
-  wsStatus: MockWsStatus;
+  wsStatus: BridgeStatus;
   joints: { j1: number; j2: number; j3: number };
   targets: { j1: string; j2: string; j3: string };
   onTargetChange: (joint: "j1" | "j2" | "j3", value: string) => void;

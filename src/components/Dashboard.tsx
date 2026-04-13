@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { CameraFeedPanel } from "@/components/CameraFeedPanel";
 import { LogViewer } from "@/components/LogViewer";
 import { RobotControlPanel } from "@/components/RobotControlPanel";
+import {
+  REALSENSE_HLS_URL,
+  REALSENSE_RTSP_URL,
+  ROBOT_WS_URL,
+  USE_MOCK_WS,
+} from "@/config/bridge";
 import { useMockWebSocket } from "@/hooks/useMockWebSocket";
+import { useRobotWebSocket } from "@/hooks/useRobotWebSocket";
 import type { LogEntry, LogLevel } from "@/types/logs";
 
 const MOCK_SOURCES = ["mtx", "realsense", "motion", "laser", "safety", "ws"];
@@ -62,17 +69,61 @@ function nextLog(): LogEntry {
   };
 }
 
+function appendLog(
+  setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>,
+  entry: Omit<LogEntry, "id" | "ts"> & { id?: string; ts?: number },
+) {
+  setLogs((prev) => {
+    const next: LogEntry = {
+      id: entry.id ?? `log-${++logSeq}`,
+      ts: entry.ts ?? Date.now(),
+      level: entry.level,
+      source: entry.source,
+      message: entry.message,
+    };
+    const merged = [...prev, next];
+    return merged.length > 200 ? merged.slice(-200) : merged;
+  });
+}
+
 export function Dashboard() {
-  const { status: wsStatus } = useMockWebSocket();
-  const [joints, setJoints] = useState({ j1: 12.34, j2: -4.56, j3: 88.12 });
-  const [targets, setTargets] = useState({ j1: "12.50", j2: "-4.50", j3: "88.00" });
+  const [joints, setJoints] = useState(() =>
+    USE_MOCK_WS ? { j1: 12.34, j2: -4.56, j3: 88.12 } : { j1: 0, j2: 0, j3: 0 },
+  );
+  const [targets, setTargets] = useState(() =>
+    USE_MOCK_WS
+      ? { j1: "12.50", j2: "-4.50", j3: "88.00" }
+      : { j1: "0.00", j2: "0.00", j3: "0.00" },
+  );
   const [logs, setLogs] = useState<LogEntry[]>(() =>
-    Array.from({ length: 8 }, () => nextLog()),
+    USE_MOCK_WS ? Array.from({ length: 8 }, () => nextLog()) : [],
   );
   const [showDebug, setShowDebug] = useState(true);
   const [showVerbose, setShowVerbose] = useState(false);
 
+  const onTelemetry = useCallback((j: { j1: number; j2: number; j3: number }) => {
+    setJoints(j);
+  }, []);
+
+  const onLog = useCallback((entry: LogEntry) => {
+    setLogs((prev) => {
+      const merged = [...prev, entry];
+      return merged.length > 200 ? merged.slice(-200) : merged;
+    });
+  }, []);
+
+  const mockWs = useMockWebSocket(USE_MOCK_WS);
+  const { status: realWsStatus, sendMove, sendEstop } = useRobotWebSocket({
+    enabled: !USE_MOCK_WS,
+    url: ROBOT_WS_URL,
+    onTelemetry,
+    onLog,
+  });
+
+  const wsStatus = USE_MOCK_WS ? mockWs.status : realWsStatus;
+
   useEffect(() => {
+    if (!USE_MOCK_WS) return;
     const drift = window.setInterval(() => {
       setJoints((j) => ({
         j1: j.j1 + (Math.random() - 0.5) * 0.04,
@@ -84,6 +135,7 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!USE_MOCK_WS) return;
     const push = window.setInterval(() => {
       setLogs((prev) => {
         const next = [...prev, nextLog()];
@@ -102,58 +154,81 @@ export function Dashboard() {
     const j2 = parseFloat(targets.j2);
     const j3 = parseFloat(targets.j3);
     if ([j1, j2, j3].some((n) => Number.isNaN(n))) {
-      setLogs((p) => [
-        ...p,
-        {
-          id: `log-${++logSeq}`,
-          ts: Date.now(),
-          level: "WARN" as const,
-          source: "ui",
-          message: "Invalid target angle — enter numeric degrees for J1–J3",
-        },
-      ]);
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: "Invalid target angle — enter numeric degrees for J1–J3",
+      });
       return;
     }
-    setJoints({ j1, j2, j3 });
-    setLogs((p) => [
-      ...p,
-      {
-        id: `log-${++logSeq}`,
-        ts: Date.now(),
-        level: "INFO" as const,
+
+    if (USE_MOCK_WS) {
+      setJoints({ j1, j2, j3 });
+      appendLog(setLogs, {
+        level: "INFO",
         source: "motion",
         message: `Command queued: J1=${j1.toFixed(2)}° J2=${j2.toFixed(2)}° J3=${j3.toFixed(2)}° (mock)`,
-      },
-    ]);
-  }, [targets]);
+      });
+      return;
+    }
+
+    const ok = sendMove(j1, j2, j3);
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — command not sent`,
+      });
+    }
+  }, [targets, sendMove]);
 
   const onEstop = useCallback(() => {
-    setLogs((p) => [
-      ...p,
-      {
-        id: `log-${++logSeq}`,
-        ts: Date.now(),
-        level: "ERROR" as const,
+    if (USE_MOCK_WS) {
+      appendLog(setLogs, {
+        level: "ERROR",
         source: "safety",
         message: "E-STOP asserted — motion halted, laser disabled (mock)",
-      },
-    ]);
-  }, []);
+      });
+      return;
+    }
+    const ok = sendEstop();
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — E-STOP not sent`,
+      });
+    }
+  }, [sendEstop]);
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 text-zinc-100 md:p-6">
-      <header className="mb-6 border-b border-zinc-800 pb-4">
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-50 md:text-2xl">
-          Delta manipulator control
-        </h1>
-        <p className="mt-1 font-mono text-xs text-zinc-500">
-          Delta manipulator · Laser weed removal · Control station
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800 pb-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-50 md:text-2xl">
+            Delta manipulator control
+          </h1>
+          <p className="mt-1 font-mono text-xs text-zinc-500">
+            Delta manipulator · Laser weed removal · Control station
+          </p>
+        </div>
+        {USE_MOCK_WS ? (
+          <span
+            className="rounded border border-amber-900/70 bg-amber-950/60 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-amber-400"
+            title="Set NEXT_PUBLIC_USE_MOCK_WS=false to use ws://10.42.0.69:8765"
+          >
+            Mock bridge
+          </span>
+        ) : (
+          <span className="max-w-[min(100%,28rem)] truncate font-mono text-[10px] text-zinc-600">
+            WS {ROBOT_WS_URL}
+          </span>
+        )}
       </header>
 
       <main className="dashboard-grid">
         <section className="dashboard-area-camera">
-          <CameraFeedPanel />
+          <CameraFeedPanel hlsUrl={REALSENSE_HLS_URL} rtspUrl={REALSENSE_RTSP_URL} />
         </section>
 
         <section className="dashboard-area-robot">

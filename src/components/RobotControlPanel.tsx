@@ -5,9 +5,14 @@ import type { BridgeStatus } from "@/types/bridge";
 
 type Props = {
   wsStatus: BridgeStatus;
+  commandMode: "joint" | "coordinate";
   joints: { j1: number; j2: number; j3: number };
   targets: { j1: string; j2: string; j3: string };
+  coordinateTargets: { x: string; y: string; z: string };
+  onCommandModeChange: (mode: "joint" | "coordinate") => void;
   onTargetChange: (joint: "j1" | "j2" | "j3", value: string) => void;
+  onCoordinateTargetChange: (axis: "x" | "y" | "z", value: string) => void;
+  onJogJoint: (joint: "j1" | "j2" | "j3", direction: -1 | 1) => void;
   onSendCommand: () => void;
   onEstop: () => void;
 };
@@ -18,9 +23,14 @@ function formatAngle(n: number) {
 
 export function RobotControlPanel({
   wsStatus,
+  commandMode,
   joints,
   targets,
+  coordinateTargets,
+  onCommandModeChange,
   onTargetChange,
+  onCoordinateTargetChange,
+  onJogJoint,
   onSendCommand,
   onEstop,
 }: Props) {
@@ -79,10 +89,28 @@ export function RobotControlPanel({
                 key={label}
                 className="flex items-center justify-between gap-3 rounded border border-cyan-950/60 bg-black/40 px-3 py-2.5"
               >
-                <span className="text-xs text-zinc-500">{label}</span>
-                <span className="digital-readout inline-block min-w-[5.5rem] text-right text-lg font-medium text-cyan-300 tabular-nums">
+                <span className="w-7 text-xs text-zinc-500">{label}</span>
+                <span className="digital-readout inline-block min-w-[5.5rem] flex-1 text-right text-lg font-medium text-cyan-300 tabular-nums">
                   {formatAngle(val)}°
                 </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onJogJoint(`j${label[1]}` as "j1" | "j2" | "j3", -1)}
+                    className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-800"
+                    aria-label={`Jog ${label} negative`}
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onJogJoint(`j${label[1]}` as "j1" | "j2" | "j3", 1)}
+                    className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-800"
+                    aria-label={`Jog ${label} positive`}
+                  >
+                    +
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -90,25 +118,80 @@ export function RobotControlPanel({
 
         <section>
           <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
-            Target (°)
+            Command mode
           </h3>
-          <div className="space-y-2">
-            {(["j1", "j2", "j3"] as const).map((key, i) => (
-              <label
-                key={key}
-                className="flex items-center gap-2 font-mono text-xs text-zinc-400"
-              >
-                <span className="w-6 text-zinc-500">J{i + 1}</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={targets[key]}
-                  onChange={(e) => onTargetChange(key, e.target.value)}
-                  className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm text-zinc-100 tabular-nums outline-none ring-cyan-500/30 focus:border-cyan-600 focus:ring-1"
-                />
-              </label>
-            ))}
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onCommandModeChange("joint")}
+              className={`rounded border px-2 py-2 font-mono text-[11px] uppercase tracking-wider transition ${
+                commandMode === "joint"
+                  ? "border-cyan-700 bg-cyan-950/40 text-cyan-300"
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+              }`}
+            >
+              Joint command
+            </button>
+            <button
+              type="button"
+              onClick={() => onCommandModeChange("coordinate")}
+              className={`rounded border px-2 py-2 font-mono text-[11px] uppercase tracking-wider transition ${
+                commandMode === "coordinate"
+                  ? "border-cyan-700 bg-cyan-950/40 text-cyan-300"
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+              }`}
+            >
+              Coordinate command
+            </button>
           </div>
+
+          {commandMode === "joint" ? (
+            <>
+              <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                Target (deg)
+              </h3>
+              <div className="space-y-2">
+                {(["j1", "j2", "j3"] as const).map((key, i) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-2 font-mono text-xs text-zinc-400"
+                  >
+                    <span className="w-6 text-zinc-500">J{i + 1}</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={targets[key]}
+                      onChange={(e) => onTargetChange(key, e.target.value)}
+                      className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm text-zinc-100 tabular-nums outline-none ring-cyan-500/30 focus:border-cyan-600 focus:ring-1"
+                    />
+                  </label>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                Target coordinates
+              </h3>
+              <div className="space-y-2">
+                {(["x", "y", "z"] as const).map((axis) => (
+                  <label
+                    key={axis}
+                    className="flex items-center gap-2 font-mono text-xs text-zinc-400"
+                  >
+                    <span className="w-6 text-zinc-500 uppercase">{axis}</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={coordinateTargets[axis]}
+                      onChange={(e) => onCoordinateTargetChange(axis, e.target.value)}
+                      className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm text-zinc-100 tabular-nums outline-none ring-cyan-500/30 focus:border-cyan-600 focus:ring-1"
+                    />
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
         </section>
       </div>
 

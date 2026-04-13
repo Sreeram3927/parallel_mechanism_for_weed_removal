@@ -180,6 +180,10 @@ export function wsMoveCommand(j1: number, j2: number, j3: number) {
   return JSON.stringify({ type: "move", j1, j2, j3 });
 }
 
+export function wsMoveCoordinateCommand(x: number, y: number, z: number) {
+  return JSON.stringify({ type: "move_xyz", x, y, z });
+}
+
 export function wsEstopCommand() {
   return JSON.stringify({ type: "estop" });
 }

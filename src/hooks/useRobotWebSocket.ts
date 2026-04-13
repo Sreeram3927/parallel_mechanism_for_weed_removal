@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   parseBridgeMessages,
   wsEstopCommand,
+  wsMoveCoordinateCommand,
   wsMoveCommand,
 } from "@/lib/bridgeMessages";
 import type { LogEntry } from "@/types/logs";
@@ -161,6 +162,13 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
+  const sendMoveCoordinate = useCallback((x: number, y: number, z: number) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(wsMoveCoordinateCommand(x, y, z));
+    return true;
+  }, []);
+
   const sendEstop = useCallback(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
@@ -168,5 +176,5 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
-  return { status, lastMessageAt, sendMove, sendEstop };
+  return { status, lastMessageAt, sendMove, sendMoveCoordinate, sendEstop };
 }

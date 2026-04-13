@@ -15,6 +15,7 @@ import { useRobotWebSocket } from "@/hooks/useRobotWebSocket";
 import type { LogEntry, LogLevel } from "@/types/logs";
 
 const MOCK_SOURCES = ["mtx", "realsense", "motion", "laser", "safety", "ws"];
+const JOG_STEP_DEG = 1;
 
 const MOCK_MESSAGES: Record<LogLevel, string[]> = {
   ERROR: [
@@ -87,6 +88,7 @@ function appendLog(
 }
 
 export function Dashboard() {
+  const [commandMode, setCommandMode] = useState<"joint" | "coordinate">("joint");
   const [joints, setJoints] = useState(() =>
     USE_MOCK_WS ? { j1: 12.34, j2: -4.56, j3: 88.12 } : { j1: 0, j2: 0, j3: 0 },
   );
@@ -94,6 +96,9 @@ export function Dashboard() {
     USE_MOCK_WS
       ? { j1: "12.50", j2: "-4.50", j3: "88.00" }
       : { j1: "0.00", j2: "0.00", j3: "0.00" },
+  );
+  const [coordinateTargets, setCoordinateTargets] = useState(() =>
+    USE_MOCK_WS ? { x: "120.00", y: "0.00", z: "-260.00" } : { x: "0.00", y: "0.00", z: "0.00" },
   );
   const [logs, setLogs] = useState<LogEntry[]>(() =>
     USE_MOCK_WS ? Array.from({ length: 8 }, () => nextLog()) : [],
@@ -113,7 +118,7 @@ export function Dashboard() {
   }, []);
 
   const mockWs = useMockWebSocket(USE_MOCK_WS);
-  const { status: realWsStatus, sendMove, sendEstop } = useRobotWebSocket({
+  const { status: realWsStatus, sendMove, sendMoveCoordinate, sendEstop } = useRobotWebSocket({
     enabled: !USE_MOCK_WS,
     url: ROBOT_WS_URL,
     onTelemetry,
@@ -149,30 +154,79 @@ export function Dashboard() {
     setTargets((t) => ({ ...t, [joint]: value }));
   }, []);
 
+  const onCoordinateTargetChange = useCallback(
+    (axis: "x" | "y" | "z", value: string) => {
+      setCoordinateTargets((t) => ({ ...t, [axis]: value }));
+    },
+    [],
+  );
+
+  const onJogJoint = useCallback((joint: "j1" | "j2" | "j3", direction: -1 | 1) => {
+    setTargets((prev) => {
+      const current = Number.parseFloat(prev[joint]);
+      const safeCurrent = Number.isFinite(current) ? current : 0;
+      const next = safeCurrent + direction * JOG_STEP_DEG;
+      return { ...prev, [joint]: next.toFixed(2) };
+    });
+  }, []);
+
   const onSendCommand = useCallback(() => {
-    const j1 = parseFloat(targets.j1);
-    const j2 = parseFloat(targets.j2);
-    const j3 = parseFloat(targets.j3);
-    if ([j1, j2, j3].some((n) => Number.isNaN(n))) {
+    if (commandMode === "joint") {
+      const j1 = parseFloat(targets.j1);
+      const j2 = parseFloat(targets.j2);
+      const j3 = parseFloat(targets.j3);
+      if ([j1, j2, j3].some((n) => Number.isNaN(n))) {
+        appendLog(setLogs, {
+          level: "WARN",
+          source: "ui",
+          message: "Invalid joint target — enter numeric degrees for J1–J3",
+        });
+        return;
+      }
+
+      if (USE_MOCK_WS) {
+        setJoints({ j1, j2, j3 });
+        appendLog(setLogs, {
+          level: "INFO",
+          source: "motion",
+          message: `Joint command queued: J1=${j1.toFixed(2)}° J2=${j2.toFixed(2)}° J3=${j3.toFixed(2)}° (mock)`,
+        });
+        return;
+      }
+
+      const ok = sendMove(j1, j2, j3);
+      if (!ok) {
+        appendLog(setLogs, {
+          level: "WARN",
+          source: "ui",
+          message: `Bridge not connected (${ROBOT_WS_URL}) — command not sent`,
+        });
+      }
+      return;
+    }
+
+    const x = parseFloat(coordinateTargets.x);
+    const y = parseFloat(coordinateTargets.y);
+    const z = parseFloat(coordinateTargets.z);
+    if ([x, y, z].some((n) => Number.isNaN(n))) {
       appendLog(setLogs, {
         level: "WARN",
         source: "ui",
-        message: "Invalid target angle — enter numeric degrees for J1–J3",
+        message: "Invalid coordinate target — enter numeric X/Y/Z values",
       });
       return;
     }
 
     if (USE_MOCK_WS) {
-      setJoints({ j1, j2, j3 });
       appendLog(setLogs, {
         level: "INFO",
         source: "motion",
-        message: `Command queued: J1=${j1.toFixed(2)}° J2=${j2.toFixed(2)}° J3=${j3.toFixed(2)}° (mock)`,
+        message: `Coordinate command queued: X=${x.toFixed(2)} Y=${y.toFixed(2)} Z=${z.toFixed(2)} (mock IK)`,
       });
       return;
     }
 
-    const ok = sendMove(j1, j2, j3);
+    const ok = sendMoveCoordinate(x, y, z);
     if (!ok) {
       appendLog(setLogs, {
         level: "WARN",
@@ -180,7 +234,7 @@ export function Dashboard() {
         message: `Bridge not connected (${ROBOT_WS_URL}) — command not sent`,
       });
     }
-  }, [targets, sendMove]);
+  }, [commandMode, coordinateTargets, targets, sendMove, sendMoveCoordinate]);
 
   const onEstop = useCallback(() => {
     if (USE_MOCK_WS) {
@@ -234,9 +288,14 @@ export function Dashboard() {
         <section className="dashboard-area-robot">
           <RobotControlPanel
             wsStatus={wsStatus}
+            commandMode={commandMode}
             joints={joints}
             targets={targets}
+            coordinateTargets={coordinateTargets}
+            onCommandModeChange={setCommandMode}
             onTargetChange={onTargetChange}
+            onCoordinateTargetChange={onCoordinateTargetChange}
+            onJogJoint={onJogJoint}
             onSendCommand={onSendCommand}
             onEstop={onEstop}
           />

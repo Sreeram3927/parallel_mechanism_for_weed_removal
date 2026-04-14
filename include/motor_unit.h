@@ -86,6 +86,8 @@ class MotorUnit {
       // 4. Apply offset and normalize
       angle = fmod(angle - OFFSET + 360.0f, 360.0f); 
 
+      angle = fmod(360.0f - angle, 360.0f);
+
       _filter.update(angle);
     };
 

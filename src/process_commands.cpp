@@ -36,8 +36,8 @@ void executeJointCommand(JointCommandPacket &cmd, MotorUnit &armA, MotorUnit &ar
 
     case CMD_JOG_RELATIVE:
       if (cmd.motorId == 'A') armA.moveRelative(cmd.valA);
-      else if (cmd.motorId == 'B') armB.moveRelative(cmd.valA);
-      else if (cmd.motorId == 'C') armC.moveRelative(cmd.valA);
+      else if (cmd.motorId == 'B') armB.moveRelative(cmd.valB);
+      else if (cmd.motorId == 'C') armC.moveRelative(cmd.valC);
       else if (cmd.motorId == 'T') {
         armA.moveRelative(cmd.valA);
         armB.moveRelative(cmd.valB);

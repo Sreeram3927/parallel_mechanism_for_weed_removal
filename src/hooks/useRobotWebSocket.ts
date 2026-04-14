@@ -6,6 +6,7 @@ import {
   wsEstopCommand,
   wsMoveCoordinateCommand,
   wsMoveCommand,
+  wsJogCommand,
 } from "@/lib/bridgeMessages";
 import type { LogEntry } from "@/types/logs";
 import type { BridgeStatus } from "@/types/bridge";
@@ -169,6 +170,13 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
+  const sendJog = useCallback((dj1: number, dj2: number, dj3: number, motorId: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(wsJogCommand(dj1, dj2, dj3, motorId));
+    return true;
+  }, []);
+
   const sendEstop = useCallback(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
@@ -176,5 +184,5 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
-  return { status, lastMessageAt, sendMove, sendMoveCoordinate, sendEstop };
+  return { status, lastMessageAt, sendMove, sendMoveCoordinate, sendJog, sendEstop };
 }

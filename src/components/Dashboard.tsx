@@ -16,8 +16,6 @@ import { useRobotWebSocket } from "@/hooks/useRobotWebSocket";
 import type { LogEntry, LogLevel } from "@/types/logs";
 
 const MOCK_SOURCES = ["mtx", "realsense", "motion", "laser", "safety", "ws"];
-const JOG_STEP_DEG = 1;
-
 const MOCK_MESSAGES: Record<LogLevel, string[]> = {
   ERROR: [
     "Joint J2 following error — driver alarm",
@@ -90,6 +88,7 @@ function appendLog(
 
 export function Dashboard() {
   const [commandMode, setCommandMode] = useState<"joint" | "coordinate">("joint");
+  const [jogStepDeg, setJogStepDeg] = useState("1.00");
   const [joints, setJoints] = useState(() =>
     USE_MOCK_WS ? { j1: 12.34, j2: -4.56, j3: 88.12 } : { j1: 0, j2: 0, j3: 0 },
   );
@@ -119,12 +118,13 @@ export function Dashboard() {
   }, []);
 
   const mockWs = useMockWebSocket(USE_MOCK_WS);
-  const { status: realWsStatus, sendMove, sendMoveCoordinate, sendEstop } = useRobotWebSocket({
-    enabled: !USE_MOCK_WS,
-    url: ROBOT_WS_URL,
-    onTelemetry,
-    onLog,
-  });
+  const { status: realWsStatus, sendMove, sendMoveCoordinate, sendJog, sendEstop } =
+    useRobotWebSocket({
+      enabled: !USE_MOCK_WS,
+      url: ROBOT_WS_URL,
+      onTelemetry,
+      onLog,
+    });
 
   const wsStatus = USE_MOCK_WS ? mockWs.status : realWsStatus;
 
@@ -163,13 +163,54 @@ export function Dashboard() {
   );
 
   const onJogJoint = useCallback((joint: "j1" | "j2" | "j3", direction: -1 | 1) => {
-    setTargets((prev) => {
-      const current = Number.parseFloat(prev[joint]);
-      const safeCurrent = Number.isFinite(current) ? current : 0;
-      const next = safeCurrent + direction * JOG_STEP_DEG;
-      return { ...prev, [joint]: next.toFixed(2) };
+    const parsedStep = Number.parseFloat(jogStepDeg);
+    const jogStep = Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 1;
+    const delta = direction * jogStep;
+    const motorIdByJoint: Record<"j1" | "j2" | "j3", string> = {
+      j1: "A",
+      j2: "B",
+      j3: "C",
+    };
+    const componentByJoint: Record<"j1" | "j2" | "j3", [number, number, number]> = {
+      j1: [delta, 0, 0],
+      j2: [0, delta, 0],
+      j3: [0, 0, delta],
+    };
+    const [dj1, dj2, dj3] = componentByJoint[joint];
+
+    if (USE_MOCK_WS) {
+      setJoints((prev) => {
+        const next = { ...prev, [joint]: prev[joint] + delta };
+        setTargets({
+          j1: next.j1.toFixed(2),
+          j2: next.j2.toFixed(2),
+          j3: next.j3.toFixed(2),
+        });
+        return next;
+      });
+      appendLog(setLogs, {
+        level: "INFO",
+        source: "motion",
+        message: `Jog ${joint.toUpperCase()} ${delta >= 0 ? "+" : ""}${delta.toFixed(2)}° (mock)`,
+      });
+      return;
+    }
+
+    const ok = sendJog(dj1, dj2, dj3, motorIdByJoint[joint]);
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — jog not sent`,
+      });
+      return;
+    }
+    appendLog(setLogs, {
+      level: "INFO",
+      source: "motion",
+      message: `Jog ${joint.toUpperCase()} ${delta >= 0 ? "+" : ""}${delta.toFixed(2)}°`,
     });
-  }, []);
+  }, [jogStepDeg, sendJog]);
 
   const onSendCommand = useCallback(() => {
     if (commandMode === "joint") {
@@ -293,9 +334,11 @@ export function Dashboard() {
             joints={joints}
             targets={targets}
             coordinateTargets={coordinateTargets}
+            jogStepDeg={jogStepDeg}
             onCommandModeChange={setCommandMode}
             onTargetChange={onTargetChange}
             onCoordinateTargetChange={onCoordinateTargetChange}
+            onJogStepChange={setJogStepDeg}
             onJogJoint={onJogJoint}
             onSendCommand={onSendCommand}
             onEstop={onEstop}

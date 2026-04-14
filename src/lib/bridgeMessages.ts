@@ -177,13 +177,37 @@ export function parseBridgeMessages(raw: string): {
 }
 
 export function wsMoveCommand(j1: number, j2: number, j3: number) {
-  return JSON.stringify({ type: "move", j1, j2, j3 });
+  return JSON.stringify({ 
+    command: "CMD_MOVE_ABSOLUTE", 
+    motorId: "T",
+    valA: j1, 
+    valB: j2, 
+    valC: j3 
+  });
+}
+
+export function wsJogCommand(j1: number, j2: number, j3: number, motorId: string) {
+  return JSON.stringify({
+    command: "CMD_JOG_RELATIVE",
+    motorId: motorId,
+    valA: j1,
+    valB: j2,
+    valC: j3
+  });
 }
 
 export function wsMoveCoordinateCommand(x: number, y: number, z: number) {
-  return JSON.stringify({ type: "move_xyz", x, y, z });
+  return JSON.stringify({
+    command: "CMD_MOVE_COORDINATE",
+    x: x,
+    y: y,
+    z: z
+  });
 }
 
 export function wsEstopCommand() {
-  return JSON.stringify({ type: "estop" });
+  return JSON.stringify({ 
+    command: "CMD_STOP",
+    // valA, valB, valC are not needed for a stop command
+  });
 }

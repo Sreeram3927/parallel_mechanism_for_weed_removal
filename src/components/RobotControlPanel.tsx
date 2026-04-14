@@ -9,9 +9,11 @@ type Props = {
   joints: { j1: number; j2: number; j3: number };
   targets: { j1: string; j2: string; j3: string };
   coordinateTargets: { x: string; y: string; z: string };
+  jogStepDeg: string;
   onCommandModeChange: (mode: "joint" | "coordinate") => void;
   onTargetChange: (joint: "j1" | "j2" | "j3", value: string) => void;
   onCoordinateTargetChange: (axis: "x" | "y" | "z", value: string) => void;
+  onJogStepChange: (value: string) => void;
   onJogJoint: (joint: "j1" | "j2" | "j3", direction: -1 | 1) => void;
   onSendCommand: () => void;
   onEstop: () => void;
@@ -27,9 +29,11 @@ export function RobotControlPanel({
   joints,
   targets,
   coordinateTargets,
+  jogStepDeg,
   onCommandModeChange,
   onTargetChange,
   onCoordinateTargetChange,
+  onJogStepChange,
   onJogJoint,
   onSendCommand,
   onEstop,
@@ -77,6 +81,17 @@ export function RobotControlPanel({
           <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
             Telemetry (°)
           </h3>
+          <label className="mb-2 flex items-center gap-2 font-mono text-xs text-zinc-400">
+            <span className="text-zinc-500">Jog step (deg)</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={jogStepDeg}
+              onChange={(e) => onJogStepChange(e.target.value)}
+              className="w-24 rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 tabular-nums outline-none ring-cyan-500/30 focus:border-cyan-600 focus:ring-1"
+            />
+          </label>
           <ul className="space-y-2 font-mono">
             {(
               [
@@ -159,7 +174,7 @@ export function RobotControlPanel({
                     <span className="w-6 text-zinc-500">J{i + 1}</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.50"
                       value={targets[key]}
                       onChange={(e) => onTargetChange(key, e.target.value)}
                       className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm text-zinc-100 tabular-nums outline-none ring-cyan-500/30 focus:border-cyan-600 focus:ring-1"
@@ -182,7 +197,7 @@ export function RobotControlPanel({
                     <span className="w-6 text-zinc-500 uppercase">{axis}</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="1.00"
                       value={coordinateTargets[axis]}
                       onChange={(e) => onCoordinateTargetChange(axis, e.target.value)}
                       className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm text-zinc-100 tabular-nums outline-none ring-cyan-500/30 focus:border-cyan-600 focus:ring-1"

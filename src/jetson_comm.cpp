@@ -1,77 +1,97 @@
 #include "jetson_comm.h"
+#include "process_commands.h"
 #include "protocol.h"
+#include "kinematics.h"
 
-// ==========================================
-// INPUT HANDLING (Reading from Jetson)
-// ==========================================
+// Define states for our serial parser
+enum ParseState {
+  WAIT_HEADER,
+  WAIT_TYPE,
+  WAIT_PAYLOAD
+};
 
-void executeCommand(CommandPacket &cmd, MotorUnit &armA, MotorUnit &armB, MotorUnit &armC) {
-  
-  // Check Header
-  if (cmd.header != 0x5A) return; // Ignore invalid packets
+ParseState parserState = WAIT_HEADER;
+uint8_t rxBuffer[32];   // Buffer to hold incoming packet bytes
+uint8_t bufferIndex = 0;
+uint8_t expectedLength = 0;
+uint8_t currentType = 0;
 
-  // (Optional) Verify your uint16_t checksum here
+void processSerial(MotorUnit &armA, MotorUnit &armB, MotorUnit &armC) {
+  // Process all available bytes in the serial buffer
+  while (Serial.available() > 0) {
+    uint8_t b = Serial.read();
 
-  // Execute based on Type
-  switch (cmd.type) {
-    
-    case CMD_STOP:
-      armA.stop();
-      armB.stop();
-      armC.stop();
-      ESP_LOGI("General", "EMERGENCY STOP!!");
-      break;
-
-    case CMD_MOVE_ABSOLUTE:
-      if (cmd.motorId == 'A') armA.moveAbsolute(cmd.valA);
-      else if (cmd.motorId == 'B') armB.moveAbsolute(cmd.valA);
-      else if (cmd.motorId == 'C') armC.moveAbsolute(cmd.valA);
-      else if (cmd.motorId == 'T') {
-        armA.moveAbsolute(cmd.valA);
-        armB.moveAbsolute(cmd.valB);
-        armC.moveAbsolute(cmd.valC);
-      }
-      break;
-
-    case CMD_JOG_RELATIVE:
-      if (cmd.motorId == 'A') armA.moveRelative(cmd.valA);
-      else if (cmd.motorId == 'B') armB.moveRelative(cmd.valA);
-      else if (cmd.motorId == 'C') armC.moveRelative(cmd.valA);
-      else if (cmd.motorId == 'T') {
-        armA.moveRelative(cmd.valA);
-        armB.moveRelative(cmd.valB);
-        armC.moveRelative(cmd.valC);
-      }
-      break;
+    switch (parserState) {
       
-    default:
-      ESP_LOGW("General", "Unknown command type: %d", cmd.type);
-      break;
+      case WAIT_HEADER:
+        if (b == 0x5A) {
+          rxBuffer[0] = b;
+          parserState = WAIT_TYPE;
+        }
+        break;
+
+      case WAIT_TYPE:
+        rxBuffer[1] = b;
+        currentType = b;
+        
+        // Determine how many total bytes we need based on the command type
+        if (currentType == CMD_STOP || currentType == CMD_MOVE_ABSOLUTE || currentType == CMD_JOG_RELATIVE) {
+          expectedLength = sizeof(JointCommandPacket);
+          bufferIndex = 2;
+          parserState = WAIT_PAYLOAD;
+        } 
+        else if (currentType == 0x03) { // 0x03 is your CoordinateCommandPacket
+          expectedLength = sizeof(CoordinateCommandPacket);
+          bufferIndex = 2;
+          parserState = WAIT_PAYLOAD;
+        } 
+        else {
+          // Unknown command type, reset parser
+          ESP_LOGW("Serial", "Unknown packet type: 0x%02X", currentType);
+          parserState = WAIT_HEADER;
+        }
+        break;
+
+      case WAIT_PAYLOAD:
+        rxBuffer[bufferIndex++] = b;
+        
+        // Check if we have received the full packet
+        if (bufferIndex >= expectedLength) {
+          // Packet complete! Dispatch it.
+          dispatchCommand(rxBuffer, currentType, expectedLength, armA, armB, armC);
+          
+          // Reset for the next packet
+          parserState = WAIT_HEADER; 
+        }
+        break;
+    }
   }
 }
 
-// ==========================================
-// OUTPUT HANDLING (Sending to Jetson)
-// ==========================================
-
-void sendTelemetryToJetson(MotorUnit &armA, MotorUnit &armB, MotorUnit &armC) {
-  RobotState packet;
+void dispatchCommand(uint8_t* buffer, uint8_t type, uint8_t length, MotorUnit &armA, MotorUnit &armB, MotorUnit &armC) {
+  
+  if (type == CMD_STOP || type == CMD_MOVE_ABSOLUTE || type == CMD_JOG_RELATIVE) {
     
-  // Fill the struct with current data
-  packet.angleA = armA.getAngle();
-  packet.angleB = armB.getAngle();
-  packet.angleC = armC.getAngle();
-  
-  // Simple Checksum: Sum of the bytes (helps Jetson verify valid data)
-  packet.checksum = (uint16_t)(packet.angleA + packet.angleB + packet.angleC);
+    // Cast buffer to JointCommandPacket
+    JointCommandPacket cmd;
+    memcpy(&cmd, buffer, sizeof(JointCommandPacket));
+    
+    // (Optional but recommended) Validate Checksum here
+    // uint16_t calcChecksum = ...
+    // if (cmd.checksum != calcChecksum) return;
 
-  // START OF FRAME: Send two unique non-ASCII bytes
-  Serial.write(0xAA); 
-  Serial.write(0x55); 
-  
-  // DATA: Send the raw struct
-  Serial.write((uint8_t*)&packet, sizeof(packet));
-  
-  // END OF FRAME: Optional but helpful
-  Serial.write(0x0D);
+    executeJointCommand(cmd, armA, armB, armC);
+    
+  } 
+  else if (type == CMD_MOVE_COORDINATE) {
+    
+    // Cast buffer to CoordinateCommandPacket
+    CoordinateCommandPacket cmd;
+    memcpy(&cmd, buffer, sizeof(CoordinateCommandPacket));
+
+    // (Optional but recommended) Validate Checksum here
+
+    executeCoordinateCommand(cmd, armA, armB, armC);
+    
+  }
 }

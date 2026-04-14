@@ -1,23 +1,20 @@
 #include <Arduino.h>
 #include <motor_unit.h>
 #include <FastAccelStepper.h>
+#include <process_commands.h>
 #include <jetson_comm.h>
 #include <protocol.h>
 
 FastAccelStepperEngine engine;
 // MotorUnit(id, stepPin, dirPin, pwmPin, invertDir, offset)
-MotorUnit armA('A', 13, 14, 0, false, 47.5f);
-MotorUnit armB('B', 27, 26, 1, false, 168.0f);
-MotorUnit armC('C', 25, 32, 2, false, 168.0f);
-
-static bool ACTIVE = false;
-
-static int JOG_DEGREES = 5.0f;
+MotorUnit armA('A', 13, 14, 0, true, 239.85f);
+MotorUnit armB('B', 27, 26, 1, true, 319.57f);
+MotorUnit armC('C', 25, 32, 2, true, 18.54f);
 
 unsigned long lastTelemetryTime = 0;
 const int TELEMETRY_INTERVAL = 20; // 20ms = 50Hz update rate
 
-CommandPacket cmd;
+JointCommandPacket cmd;
 
 void setup() {
   
@@ -38,10 +35,7 @@ void setup() {
 
 void loop() {
   
-  if (Serial.available() >= sizeof(CommandPacket)) {
-    Serial.readBytes((char*)&cmd, sizeof(CommandPacket));
-    executeCommand(cmd, armA, armB, armC);
-  }
+  processSerial(armA, armB, armC);
 
   // Send telementry at regular interval
   unsigned long currentTime = millis();

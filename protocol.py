@@ -20,10 +20,12 @@ LOG_LEVEL_MAP = {
     'V': 'verbose'
 }
 
-def pack_command(command_str, motor_id, val_a, val_b, val_c):
-    """Encodes JSON command into the 17-byte packed binary struct for ESP32."""
+def pack_joint_command(command_str, motor_id, val_a, val_b, val_c):
+    """Encodes JSON command into the 17-byte packed binary struct for Joint Control."""
     header = 0x5A
-    cmd_type = COMMAND_TYPES.get(command_str, 0x00) # Default to STOP if unknown
+    
+    # Try getting from config, default to 0x00 (STOP)
+    cmd_type = COMMAND_TYPES.get(command_str, 0x00) 
     
     # Ensure motor_id is exactly 1 byte char
     m_id = str(motor_id)[0].encode('ascii') if motor_id else b'T'
@@ -31,29 +33,38 @@ def pack_command(command_str, motor_id, val_a, val_b, val_c):
     # Calculate simple checksum
     checksum = int(val_a + val_b + val_c) & 0xFFFF
     
-    # <BBcfffH means: Little-endian, uint8, uint8, char, float, float, float, uint16
+    # <BBcfffH: Little-endian, uint8, uint8, char, float, float, float, uint16 (Total: 17 bytes)
     packet = struct.pack('<BBcfffH', header, cmd_type, m_id, float(val_a), float(val_b), float(val_c), checksum)
     return packet
 
+def pack_coordinate_command(x, y, z):
+    """Encodes JSON command into the 16-byte packed binary struct for XYZ Coordinate Control."""
+    header = 0x5A
+    cmd_type = COMMAND_TYPES.get("CMD_MOVE_COORDINATE") # 0x03
+    
+    # Calculate simple checksum
+    checksum = int(x + y + z) & 0xFFFF
+    
+    # <BBfffH: Little-endian, uint8, uint8, float, float, float, uint16 (Total: 16 bytes)
+    packet = struct.pack('<BBfffH', header, cmd_type, float(x), float(y), float(z), checksum)
+    return packet
+
 def parse_esp_log(raw_line):
-    """Parses a raw serial line, formats it into a structured JSON dictionary."""
+    # ... (Keep this exactly the same as your current code) ...
     clean_line = ANSI_ESCAPE.sub('', raw_line.strip())
     if not clean_line:
         return None
     
-    # 1. Try to match the Arduino Core ESP32 format
     match = ARDUINO_LOG_PATTERN.match(clean_line)
     
     if match:
         timestamp_str, level_char, raw_message = match.groups()
-        
-        # 2. Check if the message has a custom tag like "[General] message"
         tag_match = TAG_PATTERN.match(raw_message)
         if tag_match:
             tag = tag_match.group(1).strip()
             message = tag_match.group(2).strip()
         else:
-            tag = "System" # Default to System if no custom tag is present
+            tag = "System"
             message = raw_message.strip()
             
         return {
@@ -64,7 +75,6 @@ def parse_esp_log(raw_line):
             "message": message
         }
     else:
-        # 3. Fallback for raw bootloader prints (e.g., 'ets Jun  8 2016')
         return {
             "type": "log",
             "level": "info",

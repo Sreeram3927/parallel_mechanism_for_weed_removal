@@ -1,7 +1,7 @@
 import asyncio
 import json
 import websockets
-from protocol import pack_command
+from protocol import pack_joint_command, pack_coordinate_command
 
 # Active WebSocket connections
 connected_clients = set()
@@ -13,14 +13,11 @@ async def broadcast_ws(message_dict):
     
     message_json = json.dumps(message_dict)
     
-    # Create tasks for all sends to avoid blocking.
-    # return_exceptions=True prevents a single disconnected client from crashing the gather.
     results = await asyncio.gather(
         *(client.send(message_json) for client in connected_clients),
         return_exceptions=True
     )
     
-    # Log any errors that occurred during the broadcast without crashing
     for res in results:
         if isinstance(res, Exception):
             print(f"Broadcast warning: {res}")
@@ -32,19 +29,31 @@ async def ws_handler(websocket, path, ser):
     
     try:
         async for message in websocket:
-            print("cmd recieved")
+            
             try:
                 # Parse JSON command from frontend
                 data = json.loads(message)
-                
+                print(data)
                 command = data.get("command", "CMD_STOP")
-                motor_id = data.get("motorId", "T")
-                val_a = data.get("valA", 0.0)
-                val_b = data.get("valB", 0.0)
-                val_c = data.get("valC", 0.0)
                 
-                # Pack and send to ESP32 over serial
-                binary_payload = pack_command(command, motor_id, val_a, val_b, val_c)
+                # Determine packet type based on command string
+                if command == "CMD_MOVE_COORDINATE":
+                    x = data.get("x", 0.0)
+                    y = data.get("y", 0.0)
+                    z = data.get("z", 0.0)
+                    
+                    # Pack 16-byte Coordinate packet
+                    binary_payload = pack_coordinate_command(x, y, z)
+                else:
+                    motor_id = data.get("motorId", "T")
+                    val_a = data.get("valA", 0.0)
+                    val_b = data.get("valB", 0.0)
+                    val_c = data.get("valC", 0.0)
+                    
+                    # Pack 17-byte Joint packet
+                    binary_payload = pack_joint_command(command, motor_id, val_a, val_b, val_c)
+                
+                # Send to ESP32 over serial
                 ser.write(binary_payload)
                 
                 # Echo to frontend that command was sent successfully
@@ -56,14 +65,11 @@ async def ws_handler(websocket, path, ser):
                 print(f"Error processing WS message: {e}")
                 
     except websockets.exceptions.ConnectionClosedError:
-        # Catch the specific error when a client drops abruptly (Code 1005, etc.)
         print(f"Frontend connection dropped abruptly: {websocket.remote_address}")
     except Exception as e:
-        # Catch any other unexpected websocket errors
         print(f"Unexpected WebSocket error: {e}")
         
     finally:
-        # Safely remove the client when they disconnect (normally or abruptly)
         if websocket in connected_clients:
             connected_clients.remove(websocket)
             print(f"Frontend disconnected: {websocket.remote_address}")

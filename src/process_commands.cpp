@@ -59,8 +59,12 @@ void executeCoordinateCommand(CoordinateCommandPacket &cmd, MotorUnit &armA, Mot
   // (Optional) Verify your uint16_t checksum here
 
   float angleA, angleB, angleC;
-  DeltaKinematics::inverseKinematics(cmd.x, cmd.y, cmd.z, angleA, angleB, angleC);
+  bool isReachable = DeltaKinematics::inverseKinematics(cmd.x, cmd.y, cmd.z, angleA, angleB, angleC);
   
+  if (!isReachable) {
+    return;
+  }
+
   armA.moveAbsolute(angleA);
   armB.moveAbsolute(angleB);
   armC.moveAbsolute(angleC);

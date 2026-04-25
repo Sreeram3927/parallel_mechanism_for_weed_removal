@@ -7,9 +7,10 @@
 
 FastAccelStepperEngine engine;
 // MotorUnit(id, stepPin, dirPin, pwmPin, invertDir, offset)
-MotorUnit armA('A', 13, 14, 0, true, 239.85f);
-MotorUnit armB('B', 27, 26, 1, true, 319.57f);
-MotorUnit armC('C', 25, 32, 2, true, 18.54f);
+MotorUnit armA('A', 13, 14, 0, true, 322.66f);
+MotorUnit armB('B', 27, 26, 1, true, 19.18f);
+MotorUnit armC('C', 25, 32, 2, true, 198.37f);
+
 
 unsigned long lastTelemetryTime = 0;
 const int TELEMETRY_INTERVAL = 20; // 20ms = 50Hz update rate

@@ -61,9 +61,9 @@ void executeCoordinateCommand(CoordinateCommandPacket &cmd, MotorUnit &armA, Mot
   float angleA, angleB, angleC;
   DeltaKinematics::inverseKinematics(cmd.x, cmd.y, cmd.z, angleA, angleB, angleC);
   
-  // armA.moveAbsolute(angleA);
-  // armB.moveAbsolute(angleB);
-  // armC.moveAbsolute(angleC);
+  armA.moveAbsolute(angleA);
+  armB.moveAbsolute(angleB);
+  armC.moveAbsolute(angleC);
   ESP_LOGI("General", "Moving to Coordinate (%.2f, %.2f, %.2f) => Angles (%.2f, %.2f, %.2f)", cmd.x, cmd.y, cmd.z, angleA, angleB, angleC);
 
   

@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <AS5600.h>
 #include <angle_filter.h>
+#include <calibration_lut.h>
 
 // Global helper to switch the I2C multiplexer channel
 // (Keep this outside the class so it's easily accessible)
@@ -85,10 +86,11 @@ class MotorUnit {
 
       // 4. Apply offset and normalize
       angle = fmod(angle - OFFSET + 360.0f, 360.0f); 
-
       angle = fmod(360.0f - angle, 360.0f);
 
-      _filter.update(angle);
+      float calibratedAngle = getCalibratedPhysicalAngle(_id, angle);
+
+      _filter.update(calibratedAngle);
     };
 
     float getAngle() {

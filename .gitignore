@@ -3,4 +3,4 @@ __pycache__/
 *.pyc
 mediamtx_server/LICENSE
 mediamtx_server/mediamtx
-
+ai_models/

@@ -1,6 +1,6 @@
 class Config:
     # Serial Configuration
-    SERIAL_PORT = '/dev/ttyUSB0'
+    SERIAL_PORT = '/dev/esp32'
     BAUD_RATE = 115200
 
     # WebSocket Configuration

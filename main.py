@@ -17,7 +17,7 @@ async def main():
     # 2. Initialize Vision System
     # Pass the comms trigger function as the callback.
     # When YOLO finds a weed, it will call comms.trigger_targeting(x,y,z)
-    vision = VisionSystem(target_detected_callback=comms.transform_to_manipulatorFrame) # TODO: change this!!!
+    vision = VisionSystem(target_detected_callback=comms.trigger_targeting)
     vision.setup()
 
     # 3. Start Vision in a separate background thread

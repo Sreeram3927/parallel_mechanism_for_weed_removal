@@ -72,8 +72,8 @@ class VisionSystem:
                             
                             # TODO: Fix this!!!
                             # 2. Fire callback to send to Serial
-                            # if self.target_detected_callback:
-                            #     self.target_detected_callback(target_x, target_y, target_z)
+                            if self.target_detected_callback:
+                                self.target_detected_callback(target_x, target_y, target_z)
 
                             # 3. Draw visuals
                             cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)

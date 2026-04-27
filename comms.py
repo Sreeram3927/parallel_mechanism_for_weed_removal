@@ -5,6 +5,7 @@ import serial
 import struct
 from config import Config
 from protocol import ProtocolManager
+import numpy as np
 
 class SystemCommunicator:
     def __init__(self):
@@ -12,6 +13,13 @@ class SystemCommunicator:
         self.ser = None
         self.sync_marker = b'\xaa\x55\xa5\x01'
         self.packet_size = 19
+
+        self.T_cam_to_rob = np.array([
+            [ 0.0076,  0.9394, -0.5007,  246.0],  # Recalibrated (Fixes Y_man)
+            [ 0.9325,  0.2294,  0.2790, -197.0],  # Original (X_man is correct)
+            [ 0.1289, -0.6343, -0.7929,  -49.0],  # Recalibrated (Fixes Z_man)
+            [ 0.0000,  0.0000,  0.0000,    1.0]
+        ])
         
     def connect_serial(self):
         """Initializes the serial connection."""
@@ -23,17 +31,49 @@ class SystemCommunicator:
         if self.ser and self.ser.is_open:
             self.ser.write(packet)
 
-    def transform_to_robotFrame(self, x, y, z):
-        """Public method for the Vision system to call upon detecting a weed."""
-        # packet = ProtocolManager.pack_coordinate_command(x, y, z)
+    def trigger_targeting(self, x_cam, y_cam, z_cam):
+        x_rob, y_rob, z_rob = self.transform_to_robotFrame(x_cam*1000, y_cam*1000 ,z_cam*1000)
+        x_man, y_man, z_man = self.transform_to_manipulatorFrame(x_rob, y_rob, z_rob)
+        # packet = ProtocolManager.pack_coordinate_command(x_man, y_man, z_man)
+        print(x_man, y_man, z_man)
         # self.send_command(packet)
-        # TODO: implement transformation
-        return
+
+    def transform_to_robotFrame(self, x_cam, y_cam, z_cam):
+        """
+        Converts weed coordinates from the Camera Frame to the Delta Robot Frame.
+        Expects inputs in the same units used during calibration (mm).
+        """
+        # 1. Convert the 3D point into a 4D homogeneous vector [x, y, z, 1.0]
+        point_camera = np.array([x_cam, y_cam, z_cam, 1.0])
+        
+        # 2. Multiply the 4x4 matrix by the 4x1 vector using the '@' operator
+        point_robot = self.T_cam_to_rob @ point_camera
+        
+        # 3. Extract the new X, Y, Z coordinates. 
+        # Rounding to 2 decimal places for cleaner serial transmission to the ESP32
+        x_rob = round(point_robot[0], 2)
+        y_rob = round(point_robot[1], 2)
+        z_rob = round(point_robot[2], 2)
+        
+        return x_rob, y_rob, z_rob
     
     def transform_to_manipulatorFrame(self, x, y, z):
-        # TODO: implement transformation
-        return
-    
+        """
+        Transforms coordinates from the Robot Frame to the Manipulator Frame.
+        - The manipulator origin is at (0, 0, -45) in the Robot Frame.
+        - The Z-axis orientation remains the same.
+        - The X and Y axes are swapped.
+        """
+        # 1. Swap the X and Y axes
+        x_m = y
+        y_m = x
+        
+        # 2. Shift the Z axis
+        # Subtracting the origin position: z - (-45) = z + 45
+        z_m = z + 45.0
+        
+        # 3. Return as floats for consistency
+        return float(x_m), float(y_m), float(z_m)
     
 
     async def broadcast_ws(self, message_dict):

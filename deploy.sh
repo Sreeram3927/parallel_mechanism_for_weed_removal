@@ -6,7 +6,7 @@ FIRMWARE_PATH=$1
 # --- CONFIGURATION ---
 JETSON_USER="sreeram"
 JETSON_IP="10.42.0.69" 
-ESP_PORT="/dev/ttyUSB0"
+ESP_PORT="/dev/esp32"
 
 # Using the absolute path prevents false positives with pgrep/pkill
 TELEMETRY_PROCESS_MATCH="[m]ain.py"

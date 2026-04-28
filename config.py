@@ -1,6 +1,7 @@
 class Config:
     # Serial Configuration
-    SERIAL_PORT = '/dev/esp32'
+    ESP_PORT = '/dev/esp32'
+    UNO_PORT = '/dev/arduino_uno'
     BAUD_RATE = 115200
 
     # WebSocket Configuration

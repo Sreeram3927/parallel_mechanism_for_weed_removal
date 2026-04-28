@@ -7,7 +7,7 @@ from config import Config
 from protocol import ProtocolManager
 import numpy as np
 
-class SystemCommunicator:
+class ESPCommunicator:
     def __init__(self):
         self.connected_clients = set()
         self.ser = None
@@ -21,10 +21,10 @@ class SystemCommunicator:
             [ 0.0000,  0.0000,  0.0000,    1.0]
         ])
         
-    def connect_serial(self):
-        """Initializes the serial connection."""
-        print(f"Opening Serial Port {Config.SERIAL_PORT} at {Config.BAUD_RATE} baud...")
-        self.ser = serial.Serial(Config.SERIAL_PORT, Config.BAUD_RATE, timeout=0)
+    def connect_esp(self):
+        """Initializes the esp connection."""
+        print(f"Opening ESP Port {Config.ESP_PORT} at {Config.BAUD_RATE} baud...")
+        self.ser = serial.Serial(Config.ESP_PORT, Config.BAUD_RATE, timeout=0)
 
     def send_command(self, packet):
         """Thread-safe write to serial. Used by WS and Vision systems."""

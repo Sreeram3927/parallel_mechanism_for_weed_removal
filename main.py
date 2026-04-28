@@ -2,22 +2,22 @@ import asyncio
 import threading
 import websockets
 from config import Config
-from comms import SystemCommunicator
+from esp_comm import ESPCommunicator
 from vision import VisionSystem
 
 async def main():
     # 1. Initialize Communications
-    comms = SystemCommunicator()
+    esp_comms = ESPCommunicator()
     try:
-        comms.connect_serial()
+        esp_comms.connect_esp()
     except Exception as e:
-        print(f"Failed to open serial port: {e}")
+        print(f"Failed to open esp port: {e}")
         return
 
     # 2. Initialize Vision System
     # Pass the comms trigger function as the callback.
     # When YOLO finds a weed, it will call comms.trigger_targeting(x,y,z)
-    vision = VisionSystem(target_detected_callback=comms.trigger_targeting)
+    vision = VisionSystem(target_detected_callback=esp_comms.trigger_targeting)
     vision.setup()
 
     # 3. Start Vision in a separate background thread
@@ -27,7 +27,7 @@ async def main():
 
     # 4. Start WebSocket server
     ws_server = await websockets.serve(
-        comms.ws_handler, 
+        esp_comms.ws_handler, 
         Config.WS_HOST, 
         Config.WS_PORT
     )
@@ -35,7 +35,7 @@ async def main():
 
     # 5. Run the Serial processing loop concurrently
     try:
-        await comms.process_serial_loop()
+        await esp_comms.process_serial_loop()
     except asyncio.CancelledError:
         pass
     finally:

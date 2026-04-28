@@ -6,41 +6,43 @@ FIRMWARE_PATH=$1
 # --- CONFIGURATION ---
 JETSON_USER="sreeram"
 JETSON_IP="10.42.0.69" 
-ESP_PORT="/dev/ttyUSB0"
+ARDUINO_PORT="/dev/arduino_uno"
+JETSON_WORKSPACE="/home/sreeram/major_project" # Where you launch Docker from
+CONTAINER_NAME="jetson_core"                   # The fixed name we gave the container
 
-# Using the absolute path prevents false positives with pgrep/pkill
+# The [m] is a regex trick to prevent pgrep from finding its own process
 TELEMETRY_PROCESS_MATCH="[m]ain.py"
-TELEMETRY_START_CMD="/home/sreeram/major_project/venv/bin/python3 /home/sreeram/major_project/main.py"
+TELEMETRY_START_CMD="python3 /workspace/main.py"
+
 # ---------------------
-
 echo "🚀 Transferring firmware to Jetson Nano..."
-# Added flags to silence SCP warnings
-scp -q -o LogLevel=ERROR "$FIRMWARE_PATH" $JETSON_USER@$JETSON_IP:/tmp/firmware.bin
+# Using -q to keep the PlatformIO output clean
+scp -q -o LogLevel=ERROR "$FIRMWARE_PATH" $JETSON_USER@$JETSON_IP:$JETSON_WORKSPACE/upload/arduino_firmware_update.hex
 
-echo "🔄 Managing processes and flashing ESP32..."
-# Added flags to silence SSH warnings and connection noise
-ssh -q -o LogLevel=ERROR $JETSON_USER@$JETSON_IP << EOF
-    echo "🔍 Checking if telemetry is currently running..."
+echo "🔄 Managing processes and flashing Arduino Uno..."
+# -t forces a pseudo-terminal if sudo is needed; -q keeps it quiet
+ssh -t -q -o LogLevel=ERROR $JETSON_USER@$JETSON_IP << EOF
     
-    # Check for the specific absolute path
-    if pgrep -f "$TELEMETRY_PROCESS_MATCH" > /dev/null; then
+    if bridge status > /dev/null; then
         WAS_RUNNING=1
-        echo "🛑 Telemetry is running. Stopping it..."
-        pkill -f "$TELEMETRY_PROCESS_MATCH"
+        bridge stop
         sleep 2 
     else
         WAS_RUNNING=0
         echo "⏸️ Telemetry is not currently running."
     fi
 
-    echo "⚡ Flashing ESP32..."
-    esptool.py --port $ESP_PORT --baud 460800 write_flash 0x10000 /tmp/firmware.bin
+    echo "⚡ Flashing Arduino Uno via avrdude..."
+    # Note: If this fails with 'Permission Denied', run: sudo usermod -aG dialout \$USER
+    docker exec $CONTAINER_NAME avrdude -v -p atmega328p -c arduino -P $ARDUINO_PORT -b 115200 -D -U flash:w:/workspace/upload/arduino_firmware_update.hex:i
 
     if [ "\$WAS_RUNNING" -eq 1 ]; then
-        echo "🟢 Restarting telemetry script..."
-        nohup $TELEMETRY_START_CMD > /tmp/telemetry.log 2>&1 &
-        echo "✅ Telemetry restarted in background!"
+        echo "🔁 Restarting telemetry..."
+        bridge start
     else
         echo "⏭️ Skipping telemetry restart (was not running previously)."
     fi
+
+    # Clean up the hex file
+   rm $JETSON_WORKSPACE/upload/arduino_firmware_update.hex
 EOF

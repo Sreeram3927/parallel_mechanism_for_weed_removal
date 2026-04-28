@@ -1,10 +1,10 @@
 #include <Arduino.h>
 #include <dc_motor.h>
 
-Motor motorLB(6, 7, false);
-Motor motorLF(9, 8, false);
-Motor motorRB(3, 2, true); 
-Motor motorRF(5, 4, true);
+Motor motorLF(3, 2, true); 
+Motor motorLB(5, 4, true);
+Motor motorRF(9, 8, false);
+Motor motorRB(6, 7, false);
 
 int defaultSpeed = 50; 
 

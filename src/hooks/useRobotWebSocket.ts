@@ -7,6 +7,7 @@ import {
   wsMoveCoordinateCommand,
   wsMoveCommand,
   wsJogCommand,
+  wsArduinoCommand,
 } from "@/lib/bridgeMessages";
 import type { LogEntry } from "@/types/logs";
 import type { BridgeStatus } from "@/types/bridge";
@@ -184,5 +185,39 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
-  return { status, lastMessageAt, sendMove, sendMoveCoordinate, sendJog, sendEstop };
+  // Use ReturnType to automatically get the correct type for setInterval 
+  // whether this is running in a browser or Node environment.
+  const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const PUBLISH_RATE_MS = 100; // Send command 10 times per second
+
+  const startDriving = useCallback((directionCommand: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    // Clear any existing interval first to prevent runaway commands
+    if (driveIntervalRef.current) {
+      clearInterval(driveIntervalRef.current);
+    }
+
+    driveIntervalRef.current = setInterval(() => {
+      // Assuming wsArduinoCommand formats the string and ws.send actually sends it
+      ws.send(wsArduinoCommand(directionCommand)); 
+    }, PUBLISH_RATE_MS);
+    return true;
+  }, []);
+
+  const stopDriving = useCallback(() => {
+    const ws = wsRef.current;
+    // Clear the interval using the ref
+    if (driveIntervalRef.current) {
+      clearInterval(driveIntervalRef.current);
+      driveIntervalRef.current = null;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(wsArduinoCommand('s'));
+    return true;
+  }, []);
+
+
+
+  return { status, lastMessageAt, sendMove, sendMoveCoordinate, sendJog, sendEstop, startDriving, stopDriving};
 }

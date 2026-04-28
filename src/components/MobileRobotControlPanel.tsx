@@ -1,6 +1,20 @@
 "use client";
 
-export function MobileRobotControlPanel() {
+import { BridgeStatus } from "@/types/bridge";
+
+type Props = {
+  wsStatus: BridgeStatus;
+  onForward: () => void;
+  onBackward: () => void;
+  onMobileRobotStop: () => void;
+};
+
+export function MobileRobotControlPanel({
+  wsStatus,
+  onForward,
+  onBackward,
+  onMobileRobotStop,
+}: Props) {
   return (
     <div className="flex min-h-[180px] flex-col rounded-lg border border-zinc-700/80 bg-zinc-900/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div className="mb-4 border-b border-zinc-800 pb-3">
@@ -12,18 +26,51 @@ export function MobileRobotControlPanel() {
         </p>
       </div>
 
-      <div className="grid flex-1 grid-cols-1 gap-3">
+      {/* select-none prevents text highlighting while holding/tapping */}
+      <div className="grid flex-1 grid-cols-1 gap-3 select-none">
         <button
           type="button"
-          className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800"
+          onMouseDown={onForward}
+          onMouseUp={onMobileRobotStop}
+          // onMouseLeave={onMobileRobotStop}
+          onTouchStart={(e) => { 
+            e.preventDefault(); 
+            onForward(); 
+          }}
+          onTouchEnd={(e) => { 
+            e.preventDefault(); 
+            onMobileRobotStop(); 
+          }}
+          className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800 active:scale-[0.98] active:from-zinc-800 active:to-zinc-950"
         >
           Forward
         </button>
+        
         <button
           type="button"
-          className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800"
+          onMouseDown={onBackward}
+          onMouseUp={onMobileRobotStop}
+          // onMouseLeave={onMobileRobotStop}
+          onTouchStart={(e) => { 
+            e.preventDefault(); 
+            onBackward(); 
+          }}
+          onTouchEnd={(e) => { 
+            e.preventDefault(); 
+            onMobileRobotStop(); 
+          }}
+          className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800 active:scale-[0.98] active:from-zinc-800 active:to-zinc-950"
         >
           Backward
+        </button>
+
+        {/* Manual stop override button */}
+        <button
+          type="button"
+          onClick={onMobileRobotStop}
+          className="flex h-12 items-center justify-center rounded border border-red-900/50 bg-gradient-to-b from-red-800 to-red-950 font-mono text-xs font-semibold uppercase tracking-wider text-red-100 shadow-md transition hover:from-red-700 hover:to-red-900 active:scale-[0.98]"
+        >
+          Stop Base
         </button>
       </div>
     </div>

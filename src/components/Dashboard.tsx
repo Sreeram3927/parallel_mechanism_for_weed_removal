@@ -118,7 +118,7 @@ export function Dashboard() {
   }, []);
 
   const mockWs = useMockWebSocket(USE_MOCK_WS);
-  const { status: realWsStatus, sendMove, sendMoveCoordinate, sendJog, sendEstop } =
+  const { status: realWsStatus, sendMove, sendMoveCoordinate, sendJog, sendEstop, startDriving, stopDriving } =
     useRobotWebSocket({
       enabled: !USE_MOCK_WS,
       url: ROBOT_WS_URL,
@@ -297,6 +297,62 @@ export function Dashboard() {
     }
   }, [sendEstop]);
 
+  const onForward = useCallback(() => {
+    if (USE_MOCK_WS) {
+      appendLog(setLogs, {
+        level: "INFO",
+        source: "mobile",
+        message: "Forward command sent (mock)",
+      });
+    }
+
+    const ok = startDriving('f');
+    if (!ok) {
+      appendLog(setLogs, {
+      level: "WARN",
+      source: "ui",
+      message: `Bridge not connected (${ROBOT_WS_URL}) — Arduino command not sent`,
+    });
+  }
+  }, [startDriving]);
+
+  const onBackward = useCallback(() => {
+    if (USE_MOCK_WS) {
+      appendLog(setLogs, {
+        level: "INFO",
+        source: "mobile",
+        message: "Backward command sent (mock)",
+      });
+    }
+    const ok = startDriving('b');
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — Arduino command not sent`,
+      });
+    }
+  }, [startDriving]);
+
+  const onMobileRobotStop = useCallback(() => {
+    if (USE_MOCK_WS) {
+      appendLog(setLogs, {
+        level: "INFO",
+        source: "mobile",
+        message: "Stop command sent (mock)",
+      });
+    }
+
+    const ok = stopDriving();
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — Arduino command not sent`,
+      });
+    }
+  }, [stopDriving]);
+
   return (
     <div className="min-h-screen bg-zinc-950 p-4 text-zinc-100 md:p-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800 pb-4">
@@ -346,7 +402,12 @@ export function Dashboard() {
         </section>
 
         <section className="dashboard-area-mobile-robot">
-          <MobileRobotControlPanel />
+          <MobileRobotControlPanel
+            wsStatus={wsStatus}
+            onForward={onForward}
+            onBackward={onBackward}
+            onMobileRobotStop={onMobileRobotStop}
+          />
         </section>
 
         <section className="dashboard-area-logs">

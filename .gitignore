@@ -4,3 +4,5 @@ __pycache__/
 mediamtx_server/LICENSE
 mediamtx_server/mediamtx
 ai_models/
+logs/
+upload/

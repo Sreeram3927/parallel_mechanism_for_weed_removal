@@ -2,3 +2,5 @@ pyrealsense2
 pyserial
 numpy==1.23.5
 websockets
+
+esptool

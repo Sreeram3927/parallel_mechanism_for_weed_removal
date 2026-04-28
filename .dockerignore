@@ -1,9 +1,6 @@
 # Ignore the MediaMTX server folder
 mediamtx_server/
 
-# Ignore local virtual environments
-venv/
-
 # Ignore python cache files
 __pycache__/
 *.pyc

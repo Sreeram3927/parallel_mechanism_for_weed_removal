@@ -5,11 +5,16 @@ use docker
 sudo docker pull ultralytics/ultralytics:latest-jetson-jetpack4
 
 # Run the container
-sudo docker run -it --ipc=host --runtime=nvidia --privileged -v /dev:/dev -v $(pwd):/workspace ultralytics/ultralytics:latest-jetson-jetpack4
-
+sudo docker run -itd \
+  --name jetson_core \
+  --restart unless-stopped \
+  --ipc=host \
+  --runtime=nvidia \
+  --privileged \
+  --network host \
+  -v /dev:/dev \
+  -v /home/sreeram/major_project:/workspace \
+  jetson-bridge:latest-v2
+# Convert AI model
 yolo export model=ai_models/boxes_ai.pt format=engine half=true device=0 opset=12 simplify=True
 
-apt-get update && apt-get install -y ffmpeg
-
-# my container
-sudo docker run -it --ipc=host --runtime=nvidia --privileged --network host -v /dev:/dev -v $(pwd):/workspace jetson-bridge

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Maximize2, Minimize2, Radio, Video } from "lucide-react";
+import { AlertCircle, Maximize2, Minimize2, Radio, Video, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWhepStream } from "@/hooks/useWhepStream";
 
@@ -16,7 +16,6 @@ export function CameraFeedPanel({ whepUrl, rtspUrl }: Props) {
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [isFs, setIsFs] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-
   const { phase, error: streamError } = useWhepStream(whepUrl, videoEl);
 
   useEffect(() => {
@@ -29,6 +28,12 @@ export function CameraFeedPanel({ whepUrl, rtspUrl }: Props) {
   const showErrorOverlay = hasStream && Boolean(streamError);
   const showNoStreamPlaceholder = !whepUrl;
   const showLive = hasStream && !streamError && phase === "connected" && isPlaying;
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = () => {
+    setIsPlaying(false);
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const toggleFullscreen = useCallback(async () => {
     const el = wrapRef.current;
@@ -54,6 +59,7 @@ export function CameraFeedPanel({ whepUrl, rtspUrl }: Props) {
       <div className="station-scanlines relative flex flex-1 items-center justify-center bg-black">
         {whepUrl ? (
           <video
+            key={refreshKey}
             ref={setVideoEl}
             className="absolute inset-0 h-full w-full object-contain"
             autoPlay
@@ -127,6 +133,14 @@ export function CameraFeedPanel({ whepUrl, rtspUrl }: Props) {
         </div>
 
         <div className="absolute right-3 top-3 z-[2] flex gap-2">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded border border-zinc-600/80 bg-zinc-950/90 text-zinc-300 shadow-md transition hover:border-zinc-500 hover:bg-zinc-900 hover:text-white"
+            aria-label="Refresh"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={toggleFullscreen}

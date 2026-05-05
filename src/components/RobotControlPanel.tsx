@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertOctagon, Send, Wifi, WifiOff } from "lucide-react";
+import { AlertOctagon, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
 import type { BridgeStatus } from "@/types/bridge";
 
 type Props = {
@@ -17,6 +17,7 @@ type Props = {
   onJogJoint: (joint: "j1" | "j2" | "j3", direction: -1 | 1) => void;
   onSendCommand: () => void;
   onEstop: () => void;
+  onRefresh: () => void; // Added onRefresh prop
 };
 
 function formatAngle(n: number) {
@@ -37,6 +38,7 @@ export function RobotControlPanel({
   onJogJoint,
   onSendCommand,
   onEstop,
+  onRefresh, // Destructured new prop
 }: Props) {
   const wsLabel =
     wsStatus === "connected"
@@ -58,21 +60,36 @@ export function RobotControlPanel({
             NEMA23 · J1–J3 · Delta laser weed unit
           </p>
         </div>
-        <div
-          className={`flex items-center gap-1.5 rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wider ${
-            wsStatus === "connected"
-              ? "border-emerald-900/60 bg-emerald-950/50 text-emerald-400"
-              : wsStatus === "connecting"
-                ? "border-amber-900/60 bg-amber-950/50 text-amber-400"
-                : "border-zinc-700 bg-zinc-950 text-zinc-500"
-          }`}
-        >
-          {wsStatus === "connected" ? (
-            <Wifi className="h-3.5 w-3.5" />
-          ) : (
-            <WifiOff className="h-3.5 w-3.5 opacity-70" />
-          )}
-          {wsLabel}
+        
+        {/* Wrapped status and refresh button in a flex container */}
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center gap-1.5 rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wider ${
+              wsStatus === "connected"
+                ? "border-emerald-900/60 bg-emerald-950/50 text-emerald-400"
+                : wsStatus === "connecting"
+                  ? "border-amber-900/60 bg-amber-950/50 text-amber-400"
+                  : "border-zinc-700 bg-zinc-950 text-zinc-500"
+            }`}
+          >
+            {wsStatus === "connected" ? (
+              <Wifi className="h-3.5 w-3.5" />
+            ) : (
+              <WifiOff className="h-3.5 w-3.5 opacity-70" />
+            )}
+            {wsLabel}
+          </div>
+          
+          {/* New Refresh Button */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="rounded border border-zinc-700 bg-zinc-900 p-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
+            aria-label="Refresh connection"
+            title="Refresh connection"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 

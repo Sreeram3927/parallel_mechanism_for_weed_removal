@@ -10,37 +10,49 @@ class VisionSystem:
         self.target_detected_callback = target_detected_callback
         self.pipeline = rs.pipeline()
         self.align = rs.align(rs.stream.color)
-        self.ffmpeg_process = None
+        self.gst_process = None
         self.running = False
 
     def setup(self):
+        # 1. HEAVY LIFTING FIRST: Load TensorRT engine (Blocks for ~8 seconds)
         print("Loading TensorRT Engine...")
         self.model = YOLO(Config.YOLO_ENGINE_PATH, task='detect')
 
+        # WARMUP: Force the GPU to load the engine by running a blank frame
+        print("Warming up YOLO to force GPU memory allocation (This will take ~8-10 seconds)...")
+        dummy_frame = np.zeros((Config.CAMERA_HEIGHT, Config.CAMERA_WIDTH, 3), dtype=np.uint8)
+        self.model.predict(source=dummy_frame, verbose=False)
+        print("Warmup complete. GPU is ready.")
+
+        # 2. START HARDWARE: Boot up RealSense
+        print("Starting RealSense camera...")
         config = rs.config()
         config.enable_stream(rs.stream.depth, Config.CAMERA_WIDTH, Config.CAMERA_HEIGHT, rs.format.z16, Config.CAMERA_FPS)
         config.enable_stream(rs.stream.color, Config.CAMERA_WIDTH, Config.CAMERA_HEIGHT, rs.format.bgr8, Config.CAMERA_FPS)
-
-        print("Starting RealSense camera...")
         self.pipeline.start(config)
 
-        print("Initializing FFmpeg pipeline...")
-        ffmpeg_cmd = [
-            'ffmpeg', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
-            '-pix_fmt', 'bgr24', '-s', f"{Config.CAMERA_WIDTH}x{Config.CAMERA_HEIGHT}",
-            '-r', str(Config.CAMERA_FPS), '-i', '-', '-c:v', 'libx264',
-            '-preset', 'ultrafast', '-tune', 'zerolatency', '-f', 'rtsp', Config.RTSP_URL
+        # 3. START STREAMING LAST: Launch GStreamer right before the loop starts
+        print("Initializing Hardware GStreamer Subprocess...")
+        gst_cmd = [
+            'gst-launch-1.0', '-e',
+            'fdsrc', 'fd=0', '!',
+            'rawvideoparse', 'use-sink-caps=false', 
+            f'format=bgr', f'width={Config.CAMERA_WIDTH}', f'height={Config.CAMERA_HEIGHT}', f'framerate={Config.CAMERA_FPS}/1', '!',
+            'videoconvert', '!', 'video/x-raw,format=BGRx', '!',
+            'nvvidconv', '!', 'video/x-raw(memory:NVMM),format=NV12', '!',
+            'nvv4l2h264enc', 'maxperf-enable=1', 'insert-sps-pps=true', f'idrinterval={Config.CAMERA_FPS}', 'bitrate=2000000', '!',
+            'h264parse', '!',
+            'rtspclientsink', f'location={Config.RTSP_URL}', 'protocols=tcp'
         ]
         
         try:
-            self.ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            self.gst_process = subprocess.Popen(gst_cmd, stdin=subprocess.PIPE)
         except FileNotFoundError:
-            raise Exception("FFmpeg not installed. Run 'apt-get install -y ffmpeg'.")
+            raise Exception("GStreamer not installed. Run apt-get install -y gstreamer1.0-tools inside the container.")
 
     def run(self):
-        """Blocking loop. Intended to be run in its own thread."""
         self.running = True
-        print(f"Streaming live to {Config.RTSP_URL}")
+        print(f"Hardware streaming live to {Config.RTSP_URL}")
         
         try:
             while self.running:
@@ -61,7 +73,6 @@ class VisionSystem:
                     for box in result.boxes:
                         x1, y1, x2, y2 = map(int, box.xyxy[0])
                         conf = float(box.conf)
-                        
                         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                         z_dist = depth_frame.get_distance(cx, cy)
 
@@ -81,8 +92,26 @@ class VisionSystem:
                             label = f"Box {conf:.2f} | X:{target_x:.2f} Y:{target_y:.2f} Z:{target_z:.2f}"
                             cv2.putText(color_image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                if self.ffmpeg_process and self.ffmpeg_process.stdin:
-                    self.ffmpeg_process.stdin.write(color_image.tobytes())
+                # Write directly to the GStreamer command line process
+                # if self.gst_process and self.gst_process.stdin:
+                #     self.gst_process.stdin.write(color_image.tobytes())
+                # Check if the subprocess is still running (poll() returns None if alive)
+                if self.gst_process and self.gst_process.poll() is None:
+                    try:
+                        self.gst_process.stdin.write(color_image.tobytes())
+                        self.gst_process.stdin.flush() # Force the buffer through immediately
+                    except BrokenPipeError:
+                        print("WARNING: GStreamer pipe broke during write. Stream lost.")
+                        # Clean up the dead process
+                        self.gst_process.stdin.close()
+                        self.gst_process.wait()
+                        self.gst_process = None 
+                        # Optional: Add logic here to restart the subprocess if desired
+                else:
+                    # Failsafe: if the process died silently, clean it up
+                    if self.gst_process:
+                        self.gst_process = None
+                        print("WARNING: GStreamer subprocess died. Video streaming disabled, but targeting continues.")
 
         except Exception as e:
             print(f"Vision loop error: {e}")
@@ -92,7 +121,7 @@ class VisionSystem:
     def stop(self):
         self.running = False
         self.pipeline.stop()
-        if self.ffmpeg_process:
-            self.ffmpeg_process.stdin.close()
-            self.ffmpeg_process.wait()
-        print("Camera and stream closed cleanly.")
+        if self.gst_process:
+            self.gst_process.stdin.close()
+            self.gst_process.wait()
+        print("Camera and hardware stream closed cleanly.")

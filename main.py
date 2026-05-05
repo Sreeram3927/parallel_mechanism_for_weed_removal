@@ -84,9 +84,9 @@ async def main():
         )
     except asyncio.CancelledError:
         pass
-    # finally:
-        # vision.stop()
-        # vision_thread.join(timeout=2.0)
+    finally:
+        vision.stop()
+        vision_thread.join(timeout=2.0)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()

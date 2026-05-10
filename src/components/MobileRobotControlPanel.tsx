@@ -6,6 +6,8 @@ type Props = {
   wsStatus: BridgeStatus;
   onForward: () => void;
   onBackward: () => void;
+  onLeft: () => void;
+  onRight: () => void;
   onMobileRobotStop: () => void;
 };
 
@@ -13,6 +15,8 @@ export function MobileRobotControlPanel({
   wsStatus,
   onForward,
   onBackward,
+  onLeft,
+  onRight,
   onMobileRobotStop,
 }: Props) {
   return (
@@ -62,6 +66,42 @@ export function MobileRobotControlPanel({
           className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800 active:scale-[0.98] active:from-zinc-800 active:to-zinc-950"
         >
           Backward
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={onLeft}
+          onMouseUp={onMobileRobotStop}
+          // onMouseLeave={onMobileRobotStop}
+          onTouchStart={(e) => { 
+            e.preventDefault(); 
+            onLeft(); 
+          }}
+          onTouchEnd={(e) => { 
+            e.preventDefault(); 
+            onMobileRobotStop(); 
+          }}
+          className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800 active:scale-[0.98] active:from-zinc-800 active:to-zinc-950"
+        >
+          Left
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={onRight}
+          onMouseUp={onMobileRobotStop}
+          // onMouseLeave={onMobileRobotStop}
+          onTouchStart={(e) => { 
+            e.preventDefault(); 
+            onRight(); 
+          }}
+          onTouchEnd={(e) => { 
+            e.preventDefault(); 
+            onMobileRobotStop(); 
+          }}
+          className="flex h-12 items-center justify-center rounded border border-zinc-600 bg-gradient-to-b from-zinc-700 to-zinc-900 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100 shadow-md transition hover:from-zinc-600 hover:to-zinc-800 active:scale-[0.98] active:from-zinc-800 active:to-zinc-950"
+        >
+          Right
         </button>
 
         {/* Manual stop override button */}

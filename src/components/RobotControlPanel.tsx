@@ -17,7 +17,7 @@ type Props = {
   onJogJoint: (joint: "j1" | "j2" | "j3", direction: -1 | 1) => void;
   onSendCommand: () => void;
   onEstop: () => void;
-  onRefresh: () => void; // Added onRefresh prop
+  // onRefresh: () => void; // Added onRefresh prop
 };
 
 function formatAngle(n: number) {
@@ -38,7 +38,7 @@ export function RobotControlPanel({
   onJogJoint,
   onSendCommand,
   onEstop,
-  onRefresh, // Destructured new prop
+  // onRefresh, // Destructured new prop
 }: Props) {
   const wsLabel =
     wsStatus === "connected"
@@ -81,7 +81,7 @@ export function RobotControlPanel({
           </div>
           
           {/* New Refresh Button */}
-          <button
+          {/* <button
             type="button"
             onClick={onRefresh}
             className="rounded border border-zinc-700 bg-zinc-900 p-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
@@ -89,7 +89,7 @@ export function RobotControlPanel({
             title="Refresh connection"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-          </button>
+          </button> */}
         </div>
       </div>
 

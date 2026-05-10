@@ -334,6 +334,42 @@ export function Dashboard() {
     }
   }, [startDriving]);
 
+  const onLeft = useCallback(() => {
+    if (USE_MOCK_WS) {
+      appendLog(setLogs, {
+        level: "INFO",
+        source: "mobile",
+        message: "Left command sent (mock)",
+      });
+    }
+    const ok = startDriving('l');
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — Arduino command not sent`,
+      });
+    }
+  }, [startDriving]);
+
+  const onRight = useCallback(() => {
+    if (USE_MOCK_WS) {
+      appendLog(setLogs, {
+        level: "INFO",
+        source: "mobile",
+        message: "Right command sent (mock)",
+      });
+    }
+    const ok = startDriving('r');
+    if (!ok) {
+      appendLog(setLogs, {
+        level: "WARN",
+        source: "ui",
+        message: `Bridge not connected (${ROBOT_WS_URL}) — Arduino command not sent`,
+      });
+    }
+  }, [startDriving]);
+
   const onMobileRobotStop = useCallback(() => {
     if (USE_MOCK_WS) {
       appendLog(setLogs, {
@@ -398,6 +434,7 @@ export function Dashboard() {
             onJogJoint={onJogJoint}
             onSendCommand={onSendCommand}
             onEstop={onEstop}
+            // onRefresh={onRefresh}
           />
         </section>
 
@@ -406,6 +443,8 @@ export function Dashboard() {
             wsStatus={wsStatus}
             onForward={onForward}
             onBackward={onBackward}
+            onLeft={onLeft}
+            onRight={onRight}
             onMobileRobotStop={onMobileRobotStop}
           />
         </section>

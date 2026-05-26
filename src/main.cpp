@@ -13,6 +13,8 @@ const unsigned long WATCHDOG_TIMEOUT = 300; // Stop if no command for 300ms
 bool eStopActive = false;
 
 void moveRobot(int speed);
+void moveLeft(int speed);
+void moveRight(int speed);
 void stopRobot();
 
 void setup() {
@@ -71,6 +73,12 @@ void loop() {
       case 'b':
         moveRobot(-defaultSpeed);
         break;
+      case 'l':
+        moveLeft(100);
+        break;
+      case 'r':
+        moveRight(100);
+        break;
       case 's':
         stopRobot();
         break;
@@ -84,6 +92,20 @@ void moveRobot(int speed) {
   motorLF.drive(speed);
   motorRB.drive(speed);
   motorRF.drive(speed);
+}
+
+void moveLeft(int speed) {
+  motorLB.drive(-speed);
+  motorLF.drive(-speed);
+  motorRB.drive(speed);
+  motorRF.drive(speed);
+}
+
+void moveRight(int speed) {
+  motorLB.drive(speed);
+  motorLF.drive(speed);
+  motorRB.drive(-speed);
+  motorRF.drive(-speed);
 }
 
 void stopRobot() {

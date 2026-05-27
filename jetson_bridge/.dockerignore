@@ -1,0 +1,9 @@
+# Ignore the MediaMTX server folder
+mediamtx_server/
+
+# Ignore python cache files
+__pycache__/
+*.pyc
+
+# Ignore the raw .pt model since we only need the compiled .engine file now
+# ai_models/boxes_ai.pt

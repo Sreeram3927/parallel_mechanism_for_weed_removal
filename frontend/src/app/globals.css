@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply min-h-screen bg-zinc-950 text-zinc-100 antialiased;
+}
+
+/* Subtle scanline texture for industrial feel */
+.station-scanlines::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.12) 2px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  opacity: 0.35;
+  border-radius: inherit;
+}
+
+.digital-readout {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.25);
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+  min-height: calc(100vh - 8rem);
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(240px, 1fr) auto auto minmax(200px, 1fr);
+  grid-template-areas:
+    "camera"
+    "robot"
+    "mobileRobot"
+    "logs";
+}
+
+@media (min-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    grid-template-rows: minmax(320px, 1fr) auto minmax(200px, 0.9fr);
+    grid-template-areas:
+      "camera robot"
+      "camera mobileRobot"
+      "logs logs";
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr) minmax(240px, 0.9fr);
+    grid-template-rows: minmax(320px, 1fr) minmax(200px, 0.9fr);
+    grid-template-areas:
+      "camera robot mobileRobot"
+      "logs logs logs";
+  }
+}
+
+.dashboard-area-camera {
+  grid-area: camera;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-area-robot {
+  grid-area: robot;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-area-logs {
+  grid-area: logs;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-area-mobile-robot {
+  grid-area: mobileRobot;
+  display: flex;
+  flex-direction: column;
+}

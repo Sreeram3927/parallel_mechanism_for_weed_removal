@@ -12,11 +12,12 @@ class ArduinoCommunicator:
         # Make sure to define UNO_PORT and BAUD_RATE (115200) in your config.py
         self.ser = serial.Serial(Config.UNO_PORT, Config.BAUD_RATE, timeout=0)
 
-    def send_command(self, command_char):
+    def send_command(self, command_str):
         """Thread-safe write to Arduino serial."""
         if self.ser and self.ser.is_open:
-            # The Arduino expects bytes, so we encode the string character
-            self.ser.write(command_char.encode('utf-8'))
+            # Ensure command is a string, strip accidental whitespace, and ADD NEWLINE
+            command = str(command_str).strip() + '\n'
+            self.ser.write(command.encode('utf-8'))
 
     async def process_serial_loop(self, broadcast_callback):
         """Reads log replies from the Arduino and passes them to the WS broadcaster."""
@@ -33,7 +34,6 @@ class ArduinoCommunicator:
                         line, buffer = buffer.split('\n', 1)
                         clean_line = line.strip()
                         if clean_line:
-                            print(clean_line)
                             await broadcast_callback({
                                 "type": "log",
                                 "source": "arduino",

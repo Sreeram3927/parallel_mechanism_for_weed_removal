@@ -6,87 +6,105 @@ Motor motorLB(5, 4, true);
 Motor motorRF(9, 8, false);
 Motor motorRB(6, 7, false);
 
+// --- LASER SETUP ---
+const int laserPin = 11; 
+
 int defaultSpeed = 50; 
 
 unsigned long lastCommandTime = 0;
 const unsigned long WATCHDOG_TIMEOUT = 300; // Stop if no command for 300ms
 bool eStopActive = false;
+bool isStopped = true; // Flag to prevent spamming stop commands
 
 void moveRobot(int speed);
 void moveLeft(int speed);
 void moveRight(int speed);
 void stopRobot();
+void setLaser(int powerPercent); // New laser function
 
 void setup() {
   Serial.begin(115200);
+  Serial.setTimeout(10); // Very fast timeout so reading strings doesn't block the loop
+
+  // Initialize laser
+  pinMode(laserPin, OUTPUT);
+  analogWrite(laserPin, 0); // Ensure laser is OFF
 
   // Initialize all motors
   motorLB.begin();
   motorLF.begin();
   motorRB.begin();
   motorRF.begin();
-  Serial.println("Robot Ready. Send 'f' for forward, 'b' for backward, 's' to stop.");
+  
+  Serial.println("Robot & Laser Ready. Send commands ending with newline (\\n).");
 }
 
 void loop() {
   // 1. Safety Watchdog: Check if we haven't received a command recently
   if (!eStopActive && (millis() - lastCommandTime > WATCHDOG_TIMEOUT)) {
-    // We only call stopRobot() if it's not already stopped to prevent serial spam
-    stopRobot(); 
-    // We don't print "Stopped" here constantly, otherwise it floods the Jetson
+    if (!isStopped) {
+      stopRobot(); 
+      setLaser(0); // SAFETY: Turn off laser if communication is lost
+      isStopped = true;
+    }
   }
 
   // 2. Process incoming commands
   if (Serial.available() > 0) {
-    char command = Serial.read();
+    // Read the whole incoming string until a newline
+    String commandStr = Serial.readStringUntil('\n');
+    commandStr.trim(); // Remove whitespace/carriage returns
 
-    // Ignore newlines
-    if (command == '\n' || command == '\r') return; 
+    if (commandStr.length() == 0) return; // Ignore empty lines
 
     // Update the watchdog timer for ANY valid command received
     lastCommandTime = millis();
 
+    // Get the first character to determine the command type
+    char cmd = commandStr.charAt(0);
+
     // --- E-STOP LOGIC ---
-    if (command == 'E') {
+    if (cmd == 'E') {
       eStopActive = true;
       stopRobot();
-      Serial.println("🚨 E-STOP ENGAGED 🚨 Motors Locked.");
+      setLaser(0); // SAFETY: Immediately kill laser power
+      isStopped = true;
+      Serial.println("🚨 E-STOP ENGAGED 🚨 Motors & Laser Locked.");
       return;
     }
     
-    if (command == 'R') {
+    if (cmd == 'R') {
       eStopActive = false;
-      Serial.println("✅ E-STOP RESET. Motors Unlocked.");
+      Serial.println("✅ E-STOP RESET. Motors & Laser Unlocked.");
       return;
     }
 
-    // --- MOVEMENT LOGIC ---
+    // --- MOVEMENT & LASER LOGIC ---
     if (eStopActive) {
-      Serial.println("⚠️ Cannot move. E-STOP is active! Send 'R' to reset.");
-      return; // Ignore all movement commands
+      Serial.println("⚠️ Cannot execute. E-STOP is active! Send 'R' to reset.");
+      return; 
     }
 
-    switch (command) {
-      case 'f':
-        moveRobot(defaultSpeed);
+    isStopped = false; // We are actively processing a command
+
+    switch (cmd) {
+      case 'f': moveRobot(defaultSpeed); break;
+      case 'b': moveRobot(-defaultSpeed); break;
+      case 'l': moveLeft(100); break;
+      case 'r': moveRight(100); break;
+      case 's': 
+        stopRobot(); 
+        isStopped = true; 
         break;
-      case 'b':
-        moveRobot(-defaultSpeed);
-        break;
-      case 'l':
-        moveLeft(100);
-        break;
-      case 'r':
-        moveRight(100);
-        break;
-      case 's':
-        stopRobot();
+      case 'L':
+        // Extract the number after 'L' (e.g., "L75" becomes 75)
+        int power = commandStr.substring(1).toInt();
+        setLaser(power);
         break;
     }
   }
 }
 
-// Pass a positive number for forward, negative for backward
 void moveRobot(int speed) {
   motorLB.drive(speed);
   motorLF.drive(speed);
@@ -113,4 +131,15 @@ void stopRobot() {
   motorLF.stop();
   motorRB.stop();
   motorRF.stop();
+}
+
+// --- LASER CONTROL FUNCTION ---
+void setLaser(int powerPercent) {
+  powerPercent = constrain(powerPercent, 0, 100); // Keep it safe
+  int pwmValue = map(powerPercent, 0, 100, 0, 255);
+  analogWrite(laserPin, pwmValue);
+  
+  Serial.print("Laser Power set to: ");
+  Serial.print(powerPercent);
+  Serial.println("%");
 }

@@ -73,23 +73,26 @@ class VisionSystem:
                     for box in result.boxes:
                         x1, y1, x2, y2 = map(int, box.xyxy[0])
                         conf = float(box.conf)
+                        
+                        # Get the 2D pixel center of the weed
                         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                        
+                        # We still get depth just to filter out bad detections 
+                        # (e.g. ignoring things too high or too far)
                         z_dist = depth_frame.get_distance(cx, cy)
 
                         if 0.01 < z_dist < 3.0:
-                            # 1. Translate 2D Pixel + Depth into Real-World 3D space (Meters)
-                            spatial_coords = rs.rs2_deproject_pixel_to_point(depth_intrin, [cx, cy], z_dist)
-                            target_x, target_y, target_z = spatial_coords
-                            
-                            # TODO: Fix this!!!
-                            # 2. Fire callback to send to Serial
+                            # THE FIX: Stop using deproject! Just pass the raw pixels (cx, cy)
                             if self.target_detected_callback:
-                                self.target_detected_callback(target_x, target_y, target_z)
+                                # We no longer pass Z, because the table height is always 620mm
+                                self.target_detected_callback(cx, cy)
 
-                            # 3. Draw visuals
+                            # Draw visuals
                             cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                             cv2.circle(color_image, (cx, cy), 4, (0, 0, 255), -1)
-                            label = f"Box {conf:.2f} | X:{target_x:.2f} Y:{target_y:.2f} Z:{target_z:.2f}"
+                            
+                            # Update label to show pixels instead of 3D coords
+                            label = f"Box {conf:.2f} | Pixels: {cx}, {cy}"
                             cv2.putText(color_image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                 # Write directly to the GStreamer command line process

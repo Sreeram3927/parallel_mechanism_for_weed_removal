@@ -1,5 +1,6 @@
 "use client";
 
+import { LaserPowerPanel } from "@/components/LaserPowerPanel";
 import { BridgeStatus } from "@/types/bridge";
 
 type Props = {
@@ -9,6 +10,10 @@ type Props = {
   onLeft: () => void;
   onRight: () => void;
   onMobileRobotStop: () => void;
+  laserArmed: boolean;
+  onLaserArmedChange: (armed: boolean) => void;
+  laserPower: number;
+  onLaserPowerChange: (power: number) => void;
 };
 
 export function MobileRobotControlPanel({
@@ -18,6 +23,10 @@ export function MobileRobotControlPanel({
   onLeft,
   onRight,
   onMobileRobotStop,
+  laserArmed,
+  onLaserArmedChange,
+  laserPower,
+  onLaserPowerChange,
 }: Props) {
   return (
     <div className="flex min-h-[180px] flex-col rounded-lg border border-zinc-700/80 bg-zinc-900/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -112,6 +121,15 @@ export function MobileRobotControlPanel({
         >
           Stop Base
         </button>
+      </div>
+
+      <div className="mt-4 border-t border-zinc-800 pt-4">
+        <LaserPowerPanel
+          armed={laserArmed}
+          onArmedChange={onLaserArmedChange}
+          power={laserPower}
+          onPowerChange={onLaserPowerChange}
+        />
       </div>
     </div>
   );

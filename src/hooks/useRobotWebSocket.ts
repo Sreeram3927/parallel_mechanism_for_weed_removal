@@ -8,6 +8,7 @@ import {
   wsMoveCommand,
   wsJogCommand,
   wsArduinoCommand,
+  wsLaserCommand,
 } from "@/lib/bridgeMessages";
 import type { LogEntry } from "@/types/logs";
 import type { BridgeStatus } from "@/types/bridge";
@@ -67,6 +68,18 @@ export function useRobotWebSocket({
     },
     [clearReconnect],
   );
+
+  const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const laserIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const laserPowerRef = useRef(0);
+  const PUBLISH_RATE_MS = 100; // Send command 10 times per second
+
+  const clearLaserInterval = useCallback(() => {
+    if (laserIntervalRef.current) {
+      clearInterval(laserIntervalRef.current);
+      laserIntervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     stopped.current = false;
@@ -151,11 +164,16 @@ export function useRobotWebSocket({
       stopped.current = true;
       clearReconnect();
       reconnectAttempt.current = 0;
+      if (driveIntervalRef.current) {
+        clearInterval(driveIntervalRef.current);
+        driveIntervalRef.current = null;
+      }
+      clearLaserInterval();
       wsRef.current?.close();
       wsRef.current = null;
       setStatus("idle");
     };
-  }, [enabled, url, clearReconnect, scheduleReconnect]);
+  }, [enabled, url, clearReconnect, scheduleReconnect, clearLaserInterval]);
 
   const sendMove = useCallback((j1: number, j2: number, j3: number) => {
     const ws = wsRef.current;
@@ -185,11 +203,6 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
-  // Use ReturnType to automatically get the correct type for setInterval 
-  // whether this is running in a browser or Node environment.
-  const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const PUBLISH_RATE_MS = 100; // Send command 10 times per second
-
   const startDriving = useCallback((directionCommand: string) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
@@ -217,7 +230,49 @@ export function useRobotWebSocket({
     return true;
   }, []);
 
+  const sendLaser = useCallback((power: number) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(wsLaserCommand(power));
+    return true;
+  }, []);
 
+  const updateLaserStreamPower = useCallback((power: number) => {
+    laserPowerRef.current = Math.round(Math.min(100, Math.max(0, power)));
+  }, []);
 
-  return { status, lastMessageAt, sendMove, sendMoveCoordinate, sendJog, sendEstop, startDriving, stopDriving};
+  const startLaserStreaming = useCallback((power: number) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    clearLaserInterval();
+    updateLaserStreamPower(power);
+    laserIntervalRef.current = setInterval(() => {
+      ws.send(wsLaserCommand(laserPowerRef.current));
+    }, PUBLISH_RATE_MS);
+    return true;
+  }, [clearLaserInterval, updateLaserStreamPower]);
+
+  const stopLaserStreaming = useCallback(() => {
+    clearLaserInterval();
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    laserPowerRef.current = 0;
+    ws.send(wsLaserCommand(0));
+    return true;
+  }, [clearLaserInterval]);
+
+  return {
+    status,
+    lastMessageAt,
+    sendMove,
+    sendMoveCoordinate,
+    sendJog,
+    sendEstop,
+    startDriving,
+    stopDriving,
+    sendLaser,
+    updateLaserStreamPower,
+    startLaserStreaming,
+    stopLaserStreaming,
+  };
 }

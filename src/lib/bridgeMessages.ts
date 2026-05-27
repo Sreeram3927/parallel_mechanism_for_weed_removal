@@ -222,3 +222,12 @@ export function wsArduinoCommand(cmd: string) {
     command: cmd
   });
 }
+
+/** Laser power 0–100 → Arduino command string L&lt;power&gt; (e.g. L10, L100, L0). */
+export function wsLaserCommand(power: number) {
+  const clamped = Math.round(Math.min(100, Math.max(0, power)));
+  return JSON.stringify({
+    target: "arduino",
+    command: `L${clamped}`,
+  });
+}

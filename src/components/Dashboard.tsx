@@ -105,6 +105,8 @@ export function Dashboard() {
   );
   const [showDebug, setShowDebug] = useState(true);
   const [showVerbose, setShowVerbose] = useState(false);
+  const [laserPower, setLaserPower] = useState(0);
+  const [laserArmed, setLaserArmed] = useState(false);
 
   const onTelemetry = useCallback((j: { j1: number; j2: number; j3: number }) => {
     setJoints(j);
@@ -118,8 +120,18 @@ export function Dashboard() {
   }, []);
 
   const mockWs = useMockWebSocket(USE_MOCK_WS);
-  const { status: realWsStatus, sendMove, sendMoveCoordinate, sendJog, sendEstop, startDriving, stopDriving } =
-    useRobotWebSocket({
+  const {
+    status: realWsStatus,
+    sendMove,
+    sendMoveCoordinate,
+    sendJog,
+    sendEstop,
+    startDriving,
+    stopDriving,
+    updateLaserStreamPower,
+    startLaserStreaming,
+    stopLaserStreaming,
+  } = useRobotWebSocket({
       enabled: !USE_MOCK_WS,
       url: ROBOT_WS_URL,
       onTelemetry,
@@ -278,7 +290,84 @@ export function Dashboard() {
     }
   }, [commandMode, coordinateTargets, targets, sendMove, sendMoveCoordinate]);
 
+  const disarmLaser = useCallback(
+    (logMessage?: string) => {
+      setLaserArmed(false);
+      setLaserPower(0);
+      if (USE_MOCK_WS) {
+        appendLog(setLogs, {
+          level: "INFO",
+          source: "laser",
+          message: logMessage ?? "Laser disarmed — L0 (mock)",
+        });
+        return;
+      }
+      const ok = stopLaserStreaming();
+      if (!ok) {
+        appendLog(setLogs, {
+          level: "WARN",
+          source: "ui",
+          message: `Bridge not connected (${ROBOT_WS_URL}) — laser stop not sent`,
+        });
+      }
+    },
+    [stopLaserStreaming],
+  );
+
+  const onLaserArmedChange = useCallback(
+    (armed: boolean) => {
+      setLaserArmed(armed);
+      if (!armed) {
+        disarmLaser();
+        return;
+      }
+
+      const clamped = Math.round(Math.min(100, Math.max(0, laserPower)));
+      if (USE_MOCK_WS) {
+        appendLog(setLogs, {
+          level: clamped === 0 ? "INFO" : "WARN",
+          source: "laser",
+          message: `Laser armed — streaming L${clamped} @ 10 Hz (mock)`,
+        });
+        return;
+      }
+
+      const ok = startLaserStreaming(clamped);
+      if (!ok) {
+        setLaserArmed(false);
+        appendLog(setLogs, {
+          level: "WARN",
+          source: "ui",
+          message: `Bridge not connected (${ROBOT_WS_URL}) — laser stream not started`,
+        });
+      }
+    },
+    [disarmLaser, laserPower, startLaserStreaming],
+  );
+
+  const onLaserPowerChange = useCallback(
+    (power: number) => {
+      const clamped = Math.round(Math.min(100, Math.max(0, power)));
+      setLaserPower(clamped);
+      if (!laserArmed) return;
+
+      if (USE_MOCK_WS) {
+        appendLog(setLogs, {
+          level: clamped === 0 ? "INFO" : "WARN",
+          source: "laser",
+          message: `Laser power L${clamped} (mock stream)`,
+        });
+        return;
+      }
+
+      updateLaserStreamPower(clamped);
+    },
+    [laserArmed, updateLaserStreamPower],
+  );
+
   const onEstop = useCallback(() => {
+    disarmLaser("E-STOP — laser disarmed (mock)");
+
     if (USE_MOCK_WS) {
       appendLog(setLogs, {
         level: "ERROR",
@@ -295,7 +384,7 @@ export function Dashboard() {
         message: `Bridge not connected (${ROBOT_WS_URL}) — E-STOP not sent`,
       });
     }
-  }, [sendEstop]);
+  }, [sendEstop, disarmLaser]);
 
   const onForward = useCallback(() => {
     if (USE_MOCK_WS) {
@@ -446,6 +535,10 @@ export function Dashboard() {
             onLeft={onLeft}
             onRight={onRight}
             onMobileRobotStop={onMobileRobotStop}
+            laserArmed={laserArmed}
+            onLaserArmedChange={onLaserArmedChange}
+            laserPower={laserPower}
+            onLaserPowerChange={onLaserPowerChange}
           />
         </section>
 

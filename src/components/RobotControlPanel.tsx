@@ -1,7 +1,9 @@
 "use client";
 
-import { AlertOctagon, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
+import { AlertOctagon, Send, Wifi, WifiOff } from "lucide-react";
+import { TargetLocationsPanel } from "@/components/TargetLocationsPanel";
 import type { BridgeStatus } from "@/types/bridge";
+import type { VisionTarget } from "@/types/vision";
 
 type Props = {
   wsStatus: BridgeStatus;
@@ -17,6 +19,8 @@ type Props = {
   onJogJoint: (joint: "j1" | "j2" | "j3", direction: -1 | 1) => void;
   onSendCommand: () => void;
   onEstop: () => void;
+  visionTargets: VisionTarget[];
+  visionTargetsUpdatedAt: number | null;
   // onRefresh: () => void; // Added onRefresh prop
 };
 
@@ -38,6 +42,8 @@ export function RobotControlPanel({
   onJogJoint,
   onSendCommand,
   onEstop,
+  visionTargets,
+  visionTargetsUpdatedAt,
   // onRefresh, // Destructured new prop
 }: Props) {
   const wsLabel =
@@ -244,6 +250,13 @@ export function RobotControlPanel({
           <Send className="h-4 w-4" />
           Send command
         </button>
+      </div>
+
+      <div className="mt-4 border-t border-zinc-800 pt-4">
+        <TargetLocationsPanel
+          targets={visionTargets}
+          updatedAt={visionTargetsUpdatedAt}
+        />
       </div>
     </div>
   );

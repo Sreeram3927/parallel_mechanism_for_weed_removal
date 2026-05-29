@@ -14,6 +14,7 @@ import {
 import { useMockWebSocket } from "@/hooks/useMockWebSocket";
 import { useRobotWebSocket } from "@/hooks/useRobotWebSocket";
 import type { LogEntry, LogLevel } from "@/types/logs";
+import type { VisionTarget } from "@/types/vision";
 
 const MOCK_SOURCES = ["mtx", "realsense", "motion", "laser", "safety", "ws"];
 const MOCK_MESSAGES: Record<LogLevel, string[]> = {
@@ -107,6 +108,17 @@ export function Dashboard() {
   const [showVerbose, setShowVerbose] = useState(false);
   const [laserPower, setLaserPower] = useState(0);
   const [laserArmed, setLaserArmed] = useState(false);
+  const [visionTargets, setVisionTargets] = useState<VisionTarget[]>(() =>
+    USE_MOCK_WS
+      ? [
+          { x: 142, y: 218, conf: 0.91 },
+          { x: 388, y: 156, conf: 0.78 },
+        ]
+      : [],
+  );
+  const [visionTargetsUpdatedAt, setVisionTargetsUpdatedAt] = useState<number | null>(
+    () => (USE_MOCK_WS ? Date.now() : null),
+  );
 
   const onTelemetry = useCallback((j: { j1: number; j2: number; j3: number }) => {
     setJoints(j);
@@ -117,6 +129,11 @@ export function Dashboard() {
       const merged = [...prev, entry];
       return merged.length > 200 ? merged.slice(-200) : merged;
     });
+  }, []);
+
+  const onTargetLocations = useCallback((targets: VisionTarget[]) => {
+    setVisionTargets(targets);
+    setVisionTargetsUpdatedAt(Date.now());
   }, []);
 
   const mockWs = useMockWebSocket(USE_MOCK_WS);
@@ -136,9 +153,25 @@ export function Dashboard() {
       url: ROBOT_WS_URL,
       onTelemetry,
       onLog,
+      onTargetLocations,
     });
 
   const wsStatus = USE_MOCK_WS ? mockWs.status : realWsStatus;
+
+  useEffect(() => {
+    if (!USE_MOCK_WS) return;
+    const refreshTargets = window.setInterval(() => {
+      const n = Math.floor(Math.random() * 4);
+      const next: VisionTarget[] = Array.from({ length: n }, () => ({
+        x: Math.round(80 + Math.random() * 420),
+        y: Math.round(60 + Math.random() * 300),
+        conf: 0.55 + Math.random() * 0.44,
+      }));
+      setVisionTargets(next);
+      setVisionTargetsUpdatedAt(Date.now());
+    }, 2500);
+    return () => window.clearInterval(refreshTargets);
+  }, []);
 
   useEffect(() => {
     if (!USE_MOCK_WS) return;
@@ -523,6 +556,8 @@ export function Dashboard() {
             onJogJoint={onJogJoint}
             onSendCommand={onSendCommand}
             onEstop={onEstop}
+            visionTargets={visionTargets}
+            visionTargetsUpdatedAt={visionTargetsUpdatedAt}
             // onRefresh={onRefresh}
           />
         </section>

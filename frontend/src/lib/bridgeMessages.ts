@@ -1,4 +1,5 @@
 import type { LogEntry, LogLevel } from "@/types/logs";
+import type { VisionTarget } from "@/types/vision";
 
 const LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "DEBUG", "VERBOSE"];
 
@@ -14,6 +15,32 @@ function nextClientLogId() {
 
 export type BridgeTelemetry = { j1: number; j2: number; j3: number };
 
+function parseVisionTarget(item: unknown): VisionTarget | null {
+  if (!item || typeof item !== "object") return null;
+  const o = item as Record<string, unknown>;
+  const x = o.x;
+  const y = o.y;
+  const conf = o.conf ?? o.confidence ?? o.score;
+  if (
+    typeof x === "number" &&
+    Number.isFinite(x) &&
+    typeof y === "number" &&
+    Number.isFinite(y) &&
+    typeof conf === "number" &&
+    Number.isFinite(conf)
+  ) {
+    return { x, y, conf };
+  }
+  return null;
+}
+
+function parseVisionTargetList(raw: unknown): VisionTarget[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw
+    .map(parseVisionTarget)
+    .filter((t): t is VisionTarget => t !== null);
+}
+
 function coerceTimestamp(ts: unknown): number {
   if (typeof ts !== "number" || !Number.isFinite(ts)) return Date.now();
   // If it's in seconds (common for integer timestamps), convert to ms.
@@ -26,19 +53,28 @@ function coerceTimestamp(ts: unknown): number {
 export function parseBridgeMessages(raw: string): {
   telemetry: BridgeTelemetry[];
   logs: LogEntry[];
+  targetLocations: VisionTarget[][];
 } {
   const telemetry: BridgeTelemetry[] = [];
   const logs: LogEntry[] = [];
+  const targetLocations: VisionTarget[][] = [];
 
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    return { telemetry, logs };
+    return { telemetry, logs, targetLocations };
   }
 
   const visit = (o: Record<string, unknown>) => {
     const t = o.type;
+    if (t === "target_locations") {
+      const parsed = parseVisionTargetList(o.targets);
+      if (parsed !== null) {
+        targetLocations.push(parsed);
+      }
+      return;
+    }
     if (t === "telemetry") {
       const directJ1 = o.j1;
       const directJ2 = o.j2;
@@ -158,7 +194,7 @@ export function parseBridgeMessages(raw: string): {
     for (const item of data) {
       if (item && typeof item === "object") visit(item as Record<string, unknown>);
     }
-    return { telemetry, logs };
+    return { telemetry, logs, targetLocations };
   }
 
   if (data && typeof data === "object") {
@@ -168,12 +204,12 @@ export function parseBridgeMessages(raw: string): {
         if (item && typeof item === "object")
           visit(item as Record<string, unknown>);
       }
-      return { telemetry, logs };
+      return { telemetry, logs, targetLocations };
     }
     visit(root);
   }
 
-  return { telemetry, logs };
+  return { telemetry, logs, targetLocations };
 }
 
 export function wsMoveCommand(j1: number, j2: number, j3: number) {

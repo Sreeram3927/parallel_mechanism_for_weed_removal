@@ -12,12 +12,14 @@ import {
 } from "@/lib/bridgeMessages";
 import type { LogEntry } from "@/types/logs";
 import type { BridgeStatus } from "@/types/bridge";
+import type { VisionTarget } from "@/types/vision";
 
 type Options = {
   enabled: boolean;
   url: string;
   onTelemetry: (j: { j1: number; j2: number; j3: number }) => void;
   onLog: (entry: LogEntry) => void;
+  onTargetLocations?: (targets: VisionTarget[]) => void;
 };
 
 const RECONNECT_MIN_MS = 1500;
@@ -28,6 +30,7 @@ export function useRobotWebSocket({
   url,
   onTelemetry,
   onLog,
+  onTargetLocations,
 }: Options) {
   const [status, setStatus] = useState<BridgeStatus>(
     enabled ? "connecting" : "idle",
@@ -42,8 +45,10 @@ export function useRobotWebSocket({
 
   const onTelemetryRef = useRef(onTelemetry);
   const onLogRef = useRef(onLog);
+  const onTargetLocationsRef = useRef(onTargetLocations);
   onTelemetryRef.current = onTelemetry;
   onLogRef.current = onLog;
+  onTargetLocationsRef.current = onTargetLocations;
 
   const clearReconnect = useCallback(() => {
     if (reconnectTimer.current) {
@@ -136,9 +141,12 @@ export function useRobotWebSocket({
             );
           }
 
-          const { telemetry, logs } = parseBridgeMessages(raw);
+          const { telemetry, logs, targetLocations } = parseBridgeMessages(raw);
           for (const t of telemetry) onTelemetryRef.current(t);
           for (const log of logs) onLogRef.current(log);
+          for (const batch of targetLocations) {
+            onTargetLocationsRef.current?.(batch);
+          }
         };
 
         // fire-and-forget; safe for sync and async frame types
